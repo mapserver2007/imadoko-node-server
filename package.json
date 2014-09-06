@@ -1,0 +1,21 @@
+{
+  "name": "imadoko-node-server",
+  "version": "0.0.1",
+  "description": "Node server for imadoko project.",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "keywords": [
+    "imadoko"
+  ],
+  "author": "Ryuichi TANAKA",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "0.4.32",
+    "express": "4.8.5",
+    "body-parser": "1.6.5",
+    "request": "2.40.0"
+  }
+}
