@@ -30,15 +30,27 @@ var wsServer = new WebSocketServer({
     server: httpServer
 });
 
+var authenticated = {};
+
 // WebSocket Connection
 var connections = [];
 wsServer.on('connection', function(ws) {
     connections.push(ws);
-    ws.on('close', function() {
+
+    var close = function() {
+        console.log("websocket connection close.");
         connections = connections.filter(function (conn, index) {
             return conn !== ws;
         });
+    };
+
+    ws.on('message', function(authKey) {
+        if (!authenticated[authKey]) {
+            close();
+        }
     });
+
+    ws.on('close', close);
 });
 
 // WebSocket send
@@ -48,7 +60,6 @@ var broadcast = function(message) {
     });
 };
 
-var authenticated = {};
 app.get("/auth", function(req, res) {
     var authKey = req.query.authKey;
 
@@ -60,7 +71,8 @@ app.get("/auth", function(req, res) {
 
     // PostgreSQL
     var pg = require('pg');
-    var conString = process.env.DATABASE_URL;
+    // var conString = process.env.DATABASE_URL;
+    var conString = "postgres://vbwdldezfmexmg:GL34BRlq3SaMq8Jgl8XGX7GlPM@ec2-54-243-49-82.compute-1.amazonaws.com:5432/d54dic0nsag8r7?ssl=true"; // けすこと
     pg.connect(conString, function(err, client, done) {
         var sql = "SELECT UserID FROM M_Auth WHERE AuthKey = $1";
         var bind = [authKey];
@@ -89,6 +101,14 @@ app.get("/auth", function(req, res) {
     });
 });
 
+// app.get('/rest/handshake', function(req, res) {
+//     var authKey = req.query.authKey;
+//     if (authenticated[authKey]) {
+//         if ()
+//     } else {
+//         return res.status(403).end();
+//     }
+// });
 
 app.post('/rest/location', function(req, res) {
     var data = {
