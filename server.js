@@ -72,6 +72,7 @@ app.get("/auth", function(req, res) {
     // PostgreSQL
     var pg = require('pg');
     // var conString = process.env.DATABASE_URL;
+    var conString = process.env.DATABASE_URL;
     pg.connect(conString, function(err, client, done) {
         var sql = "SELECT UserID FROM M_Auth WHERE AuthKey = $1";
         var bind = [authKey];
