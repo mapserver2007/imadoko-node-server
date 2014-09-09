@@ -27,6 +27,10 @@ task :heroku_env => [:heroku_env_clean, :timezone] do
   end
 end
 
+task :heroku_pg_password_reset do
+  sh "heroku pg:credentials HEROKU_POSTGRESQL_BLACK_URL --reset"
+end
+
 task :heroku_env_clean do
   config.each do |key, value|
     sh "heroku config:remove #{key}"
