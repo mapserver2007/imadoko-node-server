@@ -37,8 +37,7 @@ var wsServer = new WebSocketServer({
 var authenticated = {};
 
 // PostgreSQL
-// var conString = process.env.DATABASE_URL;
-var conString = "postgres://hrlviduobkicky:iPa5qE6KX-U-7KVDiPRsvfnb6B@ec2-54-243-49-82.compute-1.amazonaws.com:5432/d54dic0nsag8r7?ssl=true";
+var conString = process.env.DATABASE_URL;
 pg.connect(conString, function(err, client, done) {
     var closeServer = function(err) {
         console.log(err);
