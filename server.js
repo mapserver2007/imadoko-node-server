@@ -15,6 +15,7 @@ var WebSocketServer = require('ws').Server,
     sha1 = require('sha1'),
     port = process.env.PORT || 9224;
 
+app.set('view engine', 'ejs');
 app.use(express.static(__dirname + '/'));
 
 var bodyParser = require('body-parser');
@@ -36,7 +37,8 @@ var wsServer = new WebSocketServer({
 var authenticated = {};
 
 // PostgreSQL
-var conString = process.env.DATABASE_URL;
+// var conString = process.env.DATABASE_URL;
+var conString = "postgres://hrlviduobkicky:iPa5qE6KX-U-7KVDiPRsvfnb6B@ec2-54-243-49-82.compute-1.amazonaws.com:5432/d54dic0nsag8r7?ssl=true";
 pg.connect(conString, function(err, client, done) {
     var closeServer = function(err) {
         console.log(err);
@@ -137,6 +139,10 @@ var broadcast = function(message) {
         connection.send(message);
     });
 };
+
+app.get('/', function(req, res) {
+    res.render('index');
+});
 
 app.get("/auth", function(req, res) {
     var authKey = req.query.authKey;
