@@ -47,8 +47,7 @@
 
     var obj = WebSocketHerokuClient;
     obj.connect({
-        url: "ws://localhost:9224",
-        // url: "ws://imadoko-node-server.herokuapp.com",
+        url: "ws://" + location.host,
         keepAlive: true,
         keepAliveInterval: 3000,
         autoReconnect: true
