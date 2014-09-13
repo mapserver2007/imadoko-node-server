@@ -12,6 +12,7 @@ var WebSocketServer = require('ws').Server,
     express = require('express'),
     app = express(),
     pg = require('pg'),
+    sha1 = require('sha1'),
     port = process.env.PORT || 9224;
 
 app.use(express.static(__dirname + '/'));
@@ -88,7 +89,7 @@ wsServer.on('connection', function(ws) {
         var json = JSON.parse(data);
         // polling_from_android
         // Androidからのポーリングリクエストは認証キーが必須
-        if (json.status === 'polling_from_android') {
+        if (json.request === 'polling_from_android') {
             if (!authenticated[json.authKey]) {
                 close();
             }
@@ -96,23 +97,34 @@ wsServer.on('connection', function(ws) {
         }
         // polling
         // 閲覧ユーザ(ブラウザ)からのポーリングリクエストは認証キーを必要としない
-        else if (json.status === 'polling') {
+        else if (json.request === 'polling') {
             console.log("polling request");
-        } else if (json.status === 'getPosition') {
+        }
+        else if (json.request === 'getPosition') {
             // TODO 認証キーからどのクライアントに送るかを判断する必要がある
             // 全員の位置を≈更新したい場合のみbroadcastを使う
             var userId = json.userId;
             if (userId) {
                 connections.forEach(function(connection) {
                     if (connection._userId === userId) {
+                        // FIXME この実装は複数のクライアントが接続してきた時に破綻しそうで怖い
+                        ws._senderId = sha1(Math.random().toString(36));
                         // 位置情報取得リクエストをAndroid端末に送信
-
-                        // TODO
-                        connection.send("hogehoge");
+                        connection.send(JSON.stringify({authKey: connection._authKey, senderId: ws._senderId}));
                         return;
                     }
                 });
             }
+        }
+        else if (json.request === 'location') {
+            connections.forEach(function(connection) {
+                if (connection._senderId === json.senderId) {
+                    connection._senderId = null;
+                    // 位置情報取得リクエストをAndroid端末に送信
+                    connection.send(JSON.stringify({lng: json.lng, lat: json.lat}));
+                    return;
+                }
+            });
         }
     });
 
