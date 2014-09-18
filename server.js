@@ -61,8 +61,6 @@ pg.connect(conString, function(err, client, done) {
         for (var i = 0, len = result.rows.length; i < len; i++) {
             authenticated[result.rows[i].authkey] = result.rows[i].userid;
         }
-
-        console.log(authenticated);
     });
 });
 
@@ -90,7 +88,7 @@ wsServer.on('connection', function(ws) {
         var json = JSON.parse(data);
         // polling_from_android
         // Androidからのポーリングリクエストは認証キーが必須
-        if (json.request === 'polling_from_android') {
+        if (json.requestId === 'polling_from_android') {
             if (!authenticated[json.authKey]) {
                 close();
             }
@@ -98,10 +96,10 @@ wsServer.on('connection', function(ws) {
         }
         // polling
         // 閲覧ユーザ(ブラウザ)からのポーリングリクエストは認証キーを必要としない
-        else if (json.request === 'polling') {
+        else if (json.requestId === 'polling') {
             console.log("polling request");
         }
-        else if (json.request === 'getPosition') {
+        else if (json.requestId === 'getPosition') {
             // TODO 認証キーからどのクライアントに送るかを判断する必要がある
             // 全員の位置を≈更新したい場合のみbroadcastを使う
             var userId = json.userId;
@@ -111,18 +109,19 @@ wsServer.on('connection', function(ws) {
                         // FIXME この実装は複数のクライアントが接続してきた時に破綻しそうで怖い
                         ws._senderId = sha1(Math.random().toString(36));
                         // 位置情報取得リクエストをAndroid端末に送信
-                        connection.send(JSON.stringify({authKey: connection._authKey, senderId: ws._senderId}));
+                        connection.send(JSON.stringify({authKey: connection._authKey, senderId: ws._senderId, userId: userId}));
                         return;
                     }
                 });
             }
         }
-        else if (json.request === 'location') {
+        else if (json.requestId === 'location') {
             connections.forEach(function(connection) {
                 if (connection._senderId === json.senderId) {
                     connection._senderId = null;
-                    // 位置情報取得リクエストをAndroid端末に送信
-                    connection.send(JSON.stringify({lng: json.lng, lat: json.lat}));
+                    // 位置情報取得リクエストをブラウザに送信
+                    console.log(json);
+                    connection.send(JSON.stringify({lng: json.lng, lat: json.lat, userId: json.userId}));
                     return;
                 }
             });

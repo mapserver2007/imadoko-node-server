@@ -30,7 +30,7 @@
             this._timerId = setInterval(function() {
                 if (self.connection !== null) {
                     if (self.connection.readyState === 1) {
-                        self.connection.send(JSON.stringify({request: "polling"}));
+                        self.connection.send(JSON.stringify({requestId: "polling"}));
                     }
                     else {
                         if (self.connection) {
@@ -54,7 +54,7 @@
     });
 
     obj.getJSON(function(data) {
-        drawMap(data.lat, data.lng);
+        drawMap(data.lat, data.lng, data.userId);
         document.getElementById("result").innerHTML += "<p>" + JSON.stringify(data) + "</p>";
     });
 
@@ -75,7 +75,7 @@
         jQuery("#move").on("click", moveMap);
 
         $("#getPosition").on("click", function() {
-            obj.send(JSON.stringify({request: "getPosition", userId: "ryuichi"}));
+            obj.send(JSON.stringify({requestId: "getPosition", userId: "ryuichi"}));
         });
     });
 
@@ -89,15 +89,29 @@
     }
 
     // 地図を描画する
-    function drawMap(lat, lng) {
+    function drawMap(lat, lng, userId) {
         jQuery("#map").empty();
         var latlng = new google.maps.LatLng(lat, lng);
+
         window.__MAP__ = new google.maps.Map(document.getElementById("map"), {
             zoom: 17,
             scaleControl: true,
             center: latlng,
             mapTypeId: google.maps.MapTypeId.ROADMAP
         });
+
+        var marker = new google.maps.Marker({
+            position: latlng,
+            map: window.__MAP__,
+            icon: "/images/man.png"
+        });
+
+        google.maps.event.addListener(marker, 'click', function(event) {
+            new google.maps.InfoWindow({
+                content: userId
+            }).open(marker.getMap(), marker);
+        });
+
     }
 
     </script>
