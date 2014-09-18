@@ -120,7 +120,6 @@ wsServer.on('connection', function(ws) {
                 if (connection._senderId === json.senderId) {
                     connection._senderId = null;
                     // 位置情報取得リクエストをブラウザに送信
-                    console.log(json);
                     connection.send(JSON.stringify({lng: json.lng, lat: json.lat, userId: json.userId}));
                     return;
                 }
