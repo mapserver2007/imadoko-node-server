@@ -58,6 +58,14 @@
         document.getElementById("result").innerHTML += "<p>" + JSON.stringify(data) + "</p>";
     });
 
+    obj.onOpen(function() {
+        $("#getPosition").attr("disabled", false);
+    });
+
+    obj.onError(function() {
+        $("#getPosition").attr("disabled", true);
+    });
+
     window.__MAP__ = {};
 
     jQuery(function() {
