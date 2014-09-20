@@ -14,7 +14,6 @@ var WebSocketServer = require('ws').Server,
     express = require('express'),
     app = express(),
     pg = require('pg'),
-    deferred = require('deferred'),
     sha1 = require('sha1'),
     port = process.env.PORT || 9224;
 
