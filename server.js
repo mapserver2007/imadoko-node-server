@@ -19,6 +19,11 @@ var WebSocketServer = require('ws').Server,
 
 var connections = [];
 var authenticated = {};
+var appConst = {
+    device: {
+        android: 1, browser: 2
+    }
+};
 
 app.set('view engine', 'ejs');
 app.use(express.static(__dirname + '/'));
@@ -47,7 +52,12 @@ var startWebSocketServer = function() {
         if (authKey) {
             ws._authKey = authKey;
             ws._userId = authenticated[authKey];
+            ws._clientId = appConst.device.android;
         }
+        else {
+            ws._clientId = appConst.device.browser;
+        }
+
         connections.push(ws);
 
         var close = function() {
@@ -70,13 +80,12 @@ var startWebSocketServer = function() {
             if (!json.userId) {
                 return;
             }
-            console.log("userId: " + json.userId);
             connections.forEach(function(connection) {
-                console.log(connection._userId);
-                if (connection._userId === json.userId) {
-                    ws._senderId = sha1(Math.random().toString(36));
+                if (connection._clientId === appConst.device.android && connection._userId === json.userId) {
+                    if (!ws.hasOwnProperty("_senderId") || ws._senderId === null) {
+                        ws._senderId = sha1(Math.random().toString(36));
+                    }
                     ws._userId = json.userId;
-                    console.log("senderId: " + ws._senderId);
                     // 位置情報取得リクエストをAndroid端末に送信
                     connection.send(JSON.stringify({authKey: connection._authKey, senderId: ws._senderId}));
                     return;
@@ -88,9 +97,7 @@ var startWebSocketServer = function() {
 
         var sendRequestBrowser = function(json) {
             connections.forEach(function(connection) {
-                console.log(json);
-                if (connection._senderId === json.senderId) {
-                    console.log("lng:" + json.lng);
+                if (connection._clientId === appConst.device.browser && connection._senderId === json.senderId) {
                     // 位置情報取得リクエストをブラウザに送信
                     connection.send(JSON.stringify({lng: json.lng, lat: json.lat, userId: connection._userId}));
                     connection._senderId = null;
