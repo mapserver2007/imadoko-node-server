@@ -30,7 +30,7 @@
             this._timerId = setInterval(function() {
                 if (self.connection !== null) {
                     if (self.connection.readyState === 1) {
-                        self.connection.send(JSON.stringify({requestId: "polling"}));
+                        self.connection.send(JSON.stringify({requestId: "polling_from_browser"}));
                     }
                     else {
                         if (self.connection) {
@@ -49,7 +49,7 @@
     obj.connect({
         url: "ws://" + location.host,
         keepAlive: true,
-        keepAliveInterval: 3000,
+        keepAliveInterval: 20000,
         autoReconnect: true
     });
 
@@ -75,7 +75,7 @@
         jQuery("#move").on("click", moveMap);
 
         $("#getPosition").on("click", function() {
-            obj.send(JSON.stringify({requestId: "getPosition", userId: "ryuichi"}));
+            obj.send(JSON.stringify({requestId: "send_request_android", userId: "ryuichi"}));
         });
     });
 

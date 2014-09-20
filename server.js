@@ -7,13 +7,19 @@
  *
  * Copyright 2013, Ryuichi TANAKA [mapserver2007@gmail.com]
  */
+'use strict';
+
 var WebSocketServer = require('ws').Server,
     http = require('http'),
     express = require('express'),
     app = express(),
     pg = require('pg'),
+    deferred = require('deferred'),
     sha1 = require('sha1'),
     port = process.env.PORT || 9224;
+
+var connections = [];
+var authenticated = {};
 
 app.set('view engine', 'ejs');
 app.use(express.static(__dirname + '/'));
@@ -33,20 +39,96 @@ var wsServer = new WebSocketServer({
     server: httpServer
 });
 
-// load authkey list
-var authenticated = {};
+// WebSocket Connection
+var startWebSocketServer = function() {
+    wsServer.on('connection', function(ws) {
+        var authKey = ws.upgradeReq.headers['x-imadoko-authkey'];
+        // Android側からの接続は認証情報を格納する
+        // 認証情報が取れない場合は、ブラウザからの閲覧専用ユーザとする
+        if (authKey) {
+            ws._authKey = authKey;
+            ws._userId = authenticated[authKey];
+        }
+        connections.push(ws);
+
+        var close = function() {
+            console.log("websocket connection close.");
+            connections = connections.filter(function (conn, index) {
+                return conn !== ws;
+            });
+        };
+
+        var pollingFromAndroid = function(authKey) {
+            if (!authenticated[authKey]) {
+                close();
+            }
+        };
+
+        var pollingFromBrowser = function() {
+        };
+
+        var sendRequestAndroid = function(json) {
+            if (!json.userId) {
+                return;
+            }
+            console.log("userId: " + json.userId);
+            connections.forEach(function(connection) {
+                console.log(connection._userId);
+                if (connection._userId === json.userId) {
+                    ws._senderId = sha1(Math.random().toString(36));
+                    ws._userId = json.userId;
+                    console.log("senderId: " + ws._senderId);
+                    // 位置情報取得リクエストをAndroid端末に送信
+                    connection.send(JSON.stringify({authKey: connection._authKey, senderId: ws._senderId}));
+                    return;
+                }
+            });
+
+            // TODO ブラウザから宛先のAndroidに到達出来なかった場合の処理
+        };
+
+        var sendRequestBrowser = function(json) {
+            connections.forEach(function(connection) {
+                console.log(json);
+                if (connection._senderId === json.senderId) {
+                    console.log("lng:" + json.lng);
+                    // 位置情報取得リクエストをブラウザに送信
+                    connection.send(JSON.stringify({lng: json.lng, lat: json.lat, userId: connection._userId}));
+                    connection._senderId = null;
+                    connection._userId = null;
+                    return;
+                }
+            });
+        };
+
+        ws.on('message', function(data) {
+            var json = JSON.parse(data);
+            console.log(json.requestId);
+            switch (json.requestId) {
+            case 'polling_from_android':
+                pollingFromAndroid(json.authKey);
+                break;
+            case 'polling_from_browser':
+                pollingFromBrowser();
+                break;
+            case 'send_request_android':
+                sendRequestAndroid(json);
+                break;
+            case 'send_request_browser':
+                sendRequestBrowser(json);
+                break;
+            }
+        });
+
+        ws.on('close', close);
+    });
+};
 
 // PostgreSQL
 var conString = process.env.DATABASE_URL;
 pg.connect(conString, function(err, client, done) {
-    var closeServer = function(err) {
-        console.log(err);
-        httpServer.close();
-    };
-
-    // DB接続失敗
     if (err) {
-        closeServer(err);
+        httpServer.close();
         return;
     }
 
@@ -54,80 +136,15 @@ pg.connect(conString, function(err, client, done) {
     client.query(sql, "", function(err, result) {
         done();
         if (err) {
-            closeServer(err);
+            httpServer.close();
             return;
         }
-
         for (var i = 0, len = result.rows.length; i < len; i++) {
             authenticated[result.rows[i].authkey] = result.rows[i].userid;
         }
+
+        startWebSocketServer();
     });
-});
-
-
-// WebSocket Connection
-var connections = [];
-wsServer.on('connection', function(ws) {
-    var authKey = ws.upgradeReq.headers['x-imadoko-authkey'];
-    // Android側からの接続は認証情報を格納する
-    // 認証情報が取れない場合は、ブラウザからの閲覧専用ユーザとする
-    if (authKey) {
-        ws._authKey = authKey;
-        ws._userId = authenticated[authKey];
-    }
-    connections.push(ws);
-
-    var close = function() {
-        console.log("websocket connection close.");
-        connections = connections.filter(function (conn, index) {
-            return conn !== ws;
-        });
-    };
-
-    ws.on('message', function(data) {
-        var json = JSON.parse(data);
-        // polling_from_android
-        // Androidからのポーリングリクエストは認証キーが必須
-        if (json.requestId === 'polling_from_android') {
-            if (!authenticated[json.authKey]) {
-                close();
-            }
-            console.log("polling request from android");
-        }
-        // polling
-        // 閲覧ユーザ(ブラウザ)からのポーリングリクエストは認証キーを必要としない
-        else if (json.requestId === 'polling') {
-            console.log("polling request");
-        }
-        else if (json.requestId === 'getPosition') {
-            // TODO 認証キーからどのクライアントに送るかを判断する必要がある
-            // 全員の位置を≈更新したい場合のみbroadcastを使う
-            var userId = json.userId;
-            if (userId) {
-                connections.forEach(function(connection) {
-                    if (connection._userId === userId) {
-                        // FIXME この実装は複数のクライアントが接続してきた時に破綻しそうで怖い
-                        ws._senderId = sha1(Math.random().toString(36));
-                        // 位置情報取得リクエストをAndroid端末に送信
-                        connection.send(JSON.stringify({authKey: connection._authKey, senderId: ws._senderId, userId: userId}));
-                        return;
-                    }
-                });
-            }
-        }
-        else if (json.requestId === 'location') {
-            connections.forEach(function(connection) {
-                if (connection._senderId === json.senderId) {
-                    connection._senderId = null;
-                    // 位置情報取得リクエストをブラウザに送信
-                    connection.send(JSON.stringify({lng: json.lng, lat: json.lat, userId: json.userId}));
-                    return;
-                }
-            });
-        }
-    });
-
-    ws.on('close', close);
 });
 
 // WebSocket send
