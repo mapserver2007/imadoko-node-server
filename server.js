@@ -46,42 +46,29 @@ var wsServer = new WebSocketServer({
 // WebSocket Connection
 var startWebSocketServer = function() {
     wsServer.on('connection', function(ws) {
+        // コネクション確立時に付与する固有キー
+        ws._connectionId = sha1(Math.random().toString(36));
+
         var authKey = ws.upgradeReq.headers['x-imadoko-authkey'];
         // Android側からの接続は認証情報を格納する
         // 認証情報が取れない場合は、ブラウザからの閲覧専用ユーザとする
         if (authKey) {
             ws._authKey = authKey;
             ws._userId = authenticated[authKey];
-            ws._clientId = appConst.device.android;
+            ws._deviceId = appConst.device.android;
         }
         else {
-            ws._clientId = appConst.device.browser;
+            ws._deviceId = appConst.device.browser;
         }
 
         connections.push(ws);
-
-        var close = function() {
-            console.log("websocket connection close.");
-            connections = connections.filter(function (conn, index) {
-                return conn !== ws;
-            });
-        };
-
-        var pollingFromAndroid = function(authKey) {
-            if (!authenticated[authKey]) {
-                close();
-            }
-        };
-
-        var pollingFromBrowser = function() {
-        };
 
         var sendRequestAndroid = function(json) {
             if (!json.userId) {
                 return;
             }
             connections.forEach(function(connection) {
-                if (connection._clientId === appConst.device.android && connection._userId === json.userId) {
+                if (connection._deviceId === appConst.device.android && connection._userId === json.userId) {
                     if (!ws.hasOwnProperty("_senderId") || ws._senderId === null) {
                         ws._senderId = sha1(Math.random().toString(36));
                     }
@@ -97,7 +84,7 @@ var startWebSocketServer = function() {
 
         var sendRequestBrowser = function(json) {
             connections.forEach(function(connection) {
-                if (connection._clientId === appConst.device.browser && connection._senderId === json.senderId) {
+                if (connection._deviceId === appConst.device.browser && connection._senderId === json.senderId) {
                     // 位置情報取得リクエストをブラウザに送信
                     connection.send(JSON.stringify({lng: json.lng, lat: json.lat, userId: connection._userId}));
                     connection._senderId = null;
@@ -107,16 +94,22 @@ var startWebSocketServer = function() {
             });
         };
 
+        ws.on("ping", function(data, flags) {
+            console.log("ping from android");
+            this.ping();
+        });
+
         ws.on('message', function(data) {
             var json = JSON.parse(data);
+
+            if (json.__ping__) {
+                console.log("ping from browser");
+                this.send(data);
+                return;
+            }
+
             console.log(json.requestId);
             switch (json.requestId) {
-            case 'polling_from_android':
-                pollingFromAndroid(json.authKey);
-                break;
-            case 'polling_from_browser':
-                pollingFromBrowser();
-                break;
             case 'send_request_android':
                 sendRequestAndroid(json);
                 break;
@@ -126,7 +119,16 @@ var startWebSocketServer = function() {
             }
         });
 
-        ws.on('close', close);
+        ws.on('error', function(e) {
+            console.log(e);
+        });
+
+        ws.on('close', function() {
+            console.log("websocket connection close.");
+            connections = connections.filter(function (conn, index) {
+                return conn !== ws;
+            });
+        });
     });
 };
 
@@ -162,6 +164,35 @@ var broadcast = function(message) {
 
 app.get('/', function(req, res) {
     res.render('index');
+});
+
+app.get('/connections', function(req, res) {
+    var connectionInfo = {connections: []};
+    connections.forEach(function (connection) {
+        connectionInfo.connections.push({
+            deviceId: connection._deviceId,
+            connectionId: connection._connectionId
+        });
+    });
+    res.set('Content-Type', 'application/json')
+        .status(200)
+        .send(JSON.stringify(connectionInfo))
+        .end();
+});
+
+app.get('/connections/:connectionId', function(req, res) {
+    // 0: 切断、1: 接続
+    var connectionInfo = {status: 0};
+    connections.forEach(function (connection) {
+        console.log(req.query.connectionId);
+        if (connection._connectionId === req.param("connectionId")) {
+            connectionInfo.status = 1;
+        }
+    });
+    res.set('Content-Type', 'application/json')
+        .status(200)
+        .send(JSON.stringify(connectionInfo))
+        .end();
 });
 
 app.get("/auth", function(req, res) {

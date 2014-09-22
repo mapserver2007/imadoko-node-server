@@ -8,49 +8,11 @@
     <script type="text/javascript" src="/views/mix.js"></script>
     <script type="text/javascript" src="/views/mix.modules.js"></script>
     <script type="text/javascript">
-    Mixjs.module("WebSocketHerokuClient", {
-        include: WebSocketClient,
-
-        connect: function(webSocketInfo) {
-            this.parent.connect(webSocketInfo);
-            if (typeof webSocketInfo === 'object') {
-                this.webSocketInfo.keepAlive = webSocketInfo.keepAlive || this.webSocketInfo.keepAlive;
-                this.webSocketInfo.keepAliveInterval = webSocketInfo.keepAliveInterval || this.webSocketInfo.keepAliveInterval;
-            }
-            if (this.webSocketInfo.keepAlive) {
-                this._keepAlive();
-            }
-        },
-
-        /**
-         * 接続を維持する
-         */
-        _keepAlive: function() {
-            var self = this;
-            this._timerId = setInterval(function() {
-                if (self.connection !== null) {
-                    if (self.connection.readyState === 1) {
-                        self.connection.send(JSON.stringify({requestId: "polling_from_browser"}));
-                    }
-                    else {
-                        if (self.connection) {
-                            self.connection.close();
-                            self.connection = null;
-                            clearInterval(self._timerId);
-                        }
-                        self.connect();
-                    }
-                }
-            }, this.webSocketInfo.keepAliveInterval);
-        }
-    })
-
-    var obj = WebSocketHerokuClient;
+    var obj = WebSocketClient;
     obj.connect({
         url: "ws://" + location.host,
-        keepAlive: true,
-        keepAliveInterval: 20000,
-        autoReconnect: true
+        autoReconnect: true,
+        heartbeatInterval: 10000
     });
 
     obj.getJSON(function(data) {
