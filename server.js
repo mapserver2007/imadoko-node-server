@@ -43,11 +43,22 @@ var wsServer = new WebSocketServer({
     server: httpServer
 });
 
+// connection clean
+var cp = require('child_process');
+cp.fork(__dirname + '/timer.js').on('message', function(time) {
+    connections = connections.filter(function (conn) {
+        console.log(conn._connectionId + " " + (time - conn._updatedAt));
+        // 30秒以上pingが飛んできていないコネクションはゾンビ化とみなしkill
+        return (time - conn._updatedAt < 30);
+    });
+});
+
 // WebSocket Connection
 var startWebSocketServer = function() {
     wsServer.on('connection', function(ws) {
         // コネクション確立時に付与する固有キー
         ws._connectionId = sha1(Math.random().toString(36));
+        ws._updatedAt = parseInt(new Date() / 1000, 10);
 
         var authKey = ws.upgradeReq.headers['x-imadoko-authkey'];
         // Android側からの接続は認証情報を格納する
@@ -95,6 +106,7 @@ var startWebSocketServer = function() {
         };
 
         ws.on("ping", function(data, flags) {
+            this._updatedAt = parseInt(new Date() / 1000, 10);
             console.log("ping from android");
             this.ping();
         });
