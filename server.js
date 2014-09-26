@@ -136,9 +136,9 @@ var startWebSocketServer = function() {
         });
 
         ws.on('close', function() {
-            console.log("websocket connection close.");
+            console.log("websocket connection close:" + ws._connectionId);
             connections = connections.filter(function (conn, index) {
-                return conn !== ws;
+                return conn._connectionId !== ws._connectionId;
             });
         });
     });
