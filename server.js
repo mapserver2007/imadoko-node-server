@@ -57,19 +57,35 @@ cp.fork(__dirname + '/timer.js').on('message', function(time) {
 var startWebSocketServer = function() {
     wsServer.on('connection', function(ws) {
         // コネクション確立時に付与する固有キー
-        ws._connectionId = sha1(Math.random().toString(36));
-        ws._updatedAt = parseInt(new Date() / 1000, 10);
+
+        // ws._connectionId = sha1(Math.random().toString(36));
 
         var authKey = ws.upgradeReq.headers['x-imadoko-authkey'];
+        // var deviceKey = ws.upgradeReq.headers['x-imadoko-devicekey'];
+
+        ws._updatedAt = parseInt(new Date() / 1000, 10);
+        ws._connectionId = sha1(authKey + "imadoko-salt");
+
         // Android側からの接続は認証情報を格納する
         // 認証情報が取れない場合は、ブラウザからの閲覧専用ユーザとする
         if (authKey) {
+            var userId = authenticated[authKey];
+            if (!userId) {
+                ws.close();
+                return;
+            }
+            // 同じデバイスから接続要求があった場合、それまでのコネクションを切断し新たに接続する
+            for (var index = 0; index < connections.length; index++) {
+                if (connections[index]._authKey === authKey) {
+                    connections[index].close();
+                }
+            }
             ws._authKey = authKey;
-            ws._userId = authenticated[authKey];
-            ws._deviceId = appConst.device.android;
+            ws._userId = userId;
+            ws._deviceType = appConst.device.android;
         }
         else {
-            ws._deviceId = appConst.device.browser;
+            ws._deviceType = appConst.device.browser;
         }
 
         connections.push(ws);
@@ -79,7 +95,7 @@ var startWebSocketServer = function() {
                 return;
             }
             connections.forEach(function(connection) {
-                if (connection._deviceId === appConst.device.android && connection._userId === json.userId) {
+                if (connection._deviceType === appConst.device.android && connection._userId === json.userId) {
                     if (!ws.hasOwnProperty("_senderId") || ws._senderId === null) {
                         ws._senderId = sha1(Math.random().toString(36));
                     }
@@ -95,7 +111,7 @@ var startWebSocketServer = function() {
 
         var sendRequestBrowser = function(json) {
             connections.forEach(function(connection) {
-                if (connection._deviceId === appConst.device.browser && connection._senderId === json.senderId) {
+                if (connection._deviceType === appConst.device.browser && connection._senderId === json.senderId) {
                     // 位置情報取得リクエストをブラウザに送信
                     connection.send(JSON.stringify({lng: json.lng, lat: json.lat, userId: connection._userId}));
                     connection._senderId = null;
@@ -106,9 +122,23 @@ var startWebSocketServer = function() {
         };
 
         ws.on("ping", function(data, flags) {
-            this._updatedAt = parseInt(new Date() / 1000, 10);
-            console.log("ping from android");
-            this.ping();
+            var isConnected = false;
+            var authKey = this._authKey;
+            connections.forEach(function(connection) {
+                if (connection._authKey == authKey) {
+                    isConnected = true;
+                    return;
+                }
+            });
+
+            if (isConnected) {
+                this._updatedAt = parseInt(new Date() / 1000, 10);
+                console.log("ping from android");
+                this.ping();
+            } else {
+                console.log("connection already closed");
+                this.close();
+            }
         });
 
         ws.on('message', function(data) {
@@ -146,6 +176,7 @@ var startWebSocketServer = function() {
 
 // PostgreSQL
 var conString = process.env.DATABASE_URL;
+conString = "postgres://rpoohjjwkrdiav:TqfUou3ApFJYawAzPblkYog11v@ec2-54-243-49-82.compute-1.amazonaws.com:5432/d54dic0nsag8r7?ssl=true";
 pg.connect(conString, function(err, client, done) {
     if (err) {
         httpServer.close();
@@ -182,7 +213,7 @@ app.get('/connections', function(req, res) {
     var connectionInfo = {connections: []};
     connections.forEach(function (connection) {
         connectionInfo.connections.push({
-            deviceId: connection._deviceId,
+            deviceType: connection._deviceType,
             connectionId: connection._connectionId
         });
     });
