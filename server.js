@@ -56,13 +56,7 @@ cp.fork(__dirname + '/timer.js').on('message', function(time) {
 // WebSocket Connection
 var startWebSocketServer = function() {
     wsServer.on('connection', function(ws) {
-        // コネクション確立時に付与する固有キー
-
-        // ws._connectionId = sha1(Math.random().toString(36));
-
         var authKey = ws.upgradeReq.headers['x-imadoko-authkey'];
-        // var deviceKey = ws.upgradeReq.headers['x-imadoko-devicekey'];
-
         ws._updatedAt = parseInt(new Date() / 1000, 10);
         ws._connectionId = sha1(authKey + "imadoko-salt");
 
@@ -176,7 +170,6 @@ var startWebSocketServer = function() {
 
 // PostgreSQL
 var conString = process.env.DATABASE_URL;
-conString = "postgres://rpoohjjwkrdiav:TqfUou3ApFJYawAzPblkYog11v@ec2-54-243-49-82.compute-1.amazonaws.com:5432/d54dic0nsag8r7?ssl=true";
 pg.connect(conString, function(err, client, done) {
     if (err) {
         httpServer.close();
