@@ -231,8 +231,8 @@ app.get('/connections/:connectionId', function(req, res) {
         .end();
 });
 
-app.get("/auth", function(req, res) {
-    var authKey = req.query.authKey;
+app.post("/auth", function(req, res) {
+    var authKey = req.body.authKey;
 
     if (authenticated[authKey]) {
         console.log("authenticate ok");
@@ -242,3 +242,34 @@ app.get("/auth", function(req, res) {
         res.status(403).end();
     }
 });
+
+app.post("/register/username", function(req, res) {
+    var authKey = req.body.authKey;
+
+    if (authenticated[authKey]) {
+        var userName = req.body.userName;
+        if (/^[a-zA-Z_-]{1,20}$/.test(userName)) {
+            pg.connect(conString, function(err, client, done) {
+                if (err) {
+                    res.status(500).end();
+                    return;
+                }
+
+                var sql = "UPDATE M_Auth SET UserID = $1 WHERE AuthKey = $2";
+                var bind = [userName, authKey];
+                client.query(sql, bind, function(err, result) {
+                    done();
+                    if (err) {
+                        res.status(403).end();
+                        return;
+                    }
+
+                    res.status(200).end();
+                });
+            });
+        }
+    } else {
+        res.status(403).end();
+    }
+});
+
