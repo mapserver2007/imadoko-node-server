@@ -90,8 +90,6 @@ var startWebSocketServer = function() {
             }
 
             connections.forEach(function(connection) {
-            console.log(json.userId)
-            console.log(connection._userId)
                 if (connection._deviceType === appConst.device.android && connection._userId === json.userId) {
                     if (!ws.hasOwnProperty("_senderId") || ws._senderId === null) {
                         ws._senderId = sha1(Math.random().toString(36));
