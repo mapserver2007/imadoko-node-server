@@ -40,3 +40,7 @@ end
 task :timezone do
   sh "heroku config:add TZ=Asia/Tokyo"
 end
+
+task :heroku_psql do
+  sh "heroku pg:psql"
+end

@@ -177,7 +177,7 @@ pg.connect(conString, function(err, client, done) {
         return;
     }
 
-    var sql = "SELECT UserID, AuthKey FROM M_Auth";
+    var sql = "SELECT UserName, AuthKey FROM M_Auth";
     client.query(sql, "", function(err, result) {
         done();
         if (err) {
@@ -185,7 +185,7 @@ pg.connect(conString, function(err, client, done) {
             return;
         }
         for (var i = 0, len = result.rows.length; i < len; i++) {
-            authenticated[result.rows[i].authkey] = result.rows[i].userid;
+            authenticated[result.rows[i].authkey] = result.rows[i].username;
         }
 
         startWebSocketServer();
@@ -244,6 +244,42 @@ app.post("/auth", function(req, res) {
     }
 });
 
+app.get("/master/geofence", function(req, res) {
+    var authKey = req.query.authKey;
+    var json = {'data': ""};
+
+    if (authenticated[authKey]) {
+        pg.connect(conString, function(err, client, done) {
+            if (err) {
+                res.status(500).end();
+                return;
+            }
+
+            var sql = "SELECT Longitude AS Lng, Latitude AS Lat, Radius, Address, LandmarkName AS Landmark FROM M_Geofence AS G " +
+                      "INNER JOIN M_Auth AS A ON G.UserId = A.Id WHERE A.AuthKey = $1";
+            var bind = [authKey];
+            client.query(sql, bind, function(err, result) {
+                done();
+                if (err) {
+                    res.status(403).end();
+                    return;
+                }
+
+                json['data'] = result.rows;
+                res.set('Content-Type', 'application/json')
+                    .status(200)
+                    .send(JSON.stringify(json))
+                    .end();
+                    });
+        });
+    } else {
+        res.set('Content-Type', 'application/json')
+            .status(200)
+            .send(JSON.stringify(json))
+            .end();
+    }
+});
+
 app.post("/register/username", function(req, res) {
     var authKey = req.body.authKey;
 
@@ -256,7 +292,7 @@ app.post("/register/username", function(req, res) {
                     return;
                 }
 
-                var sql = "UPDATE M_Auth SET UserID = $1 WHERE AuthKey = $2";
+                var sql = "UPDATE M_Auth SET UserName = $1 WHERE AuthKey = $2";
                 var bind = [userName, authKey];
                 client.query(sql, bind, function(err, result) {
                     done();
