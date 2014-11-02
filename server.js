@@ -244,9 +244,44 @@ app.post("/auth", function(req, res) {
     }
 });
 
-app.get("/master/geofence", function(req, res) {
+// app.get("/geofence/data", function(req, res) {
+//     var authKey = req.query.authKey;
+//     var json = {'data': ""};
+
+//     if (authenticated[authKey]) {
+//         pg.connect(conString, function(err, client, done) {
+//             if (err) {
+//                 res.status(500).end();
+//                 return;
+//             }
+
+//             var sql = "SELECT Longitude AS Lng, Latitude AS Lat, Radius, Address, LandmarkName AS Landmark FROM M_Geofence AS G " +
+//                       "INNER JOIN M_Auth AS A ON G.UserId = A.Id WHERE A.AuthKey = $1";
+//             var bind = [authKey];
+//             client.query(sql, bind, function(err, result) {
+//                 done();
+//                 if (err) {
+//                     res.status(500).end();
+//                     return;
+//                 }
+
+//                 json['data'] = result.rows;
+//                 res.set('Content-Type', 'application/json')
+//                     .status(200)
+//                     .send(JSON.stringify(json))
+//                     .end();
+//             });
+//         });
+//     } else {
+//         res.set('Content-Type', 'application/json')
+//             .status(200)
+//             .send(JSON.stringify(json))
+//             .end();
+//     }
+// });
+
+app.get("/geofence/status", function(req, res) {
     var authKey = req.query.authKey;
-    var json = {'data': ""};
 
     if (authenticated[authKey]) {
         pg.connect(conString, function(err, client, done) {
@@ -255,56 +290,84 @@ app.get("/master/geofence", function(req, res) {
                 return;
             }
 
-            var sql = "SELECT Longitude AS Lng, Latitude AS Lat, Radius, Address, LandmarkName AS Landmark FROM M_Geofence AS G " +
-                      "INNER JOIN M_Auth AS A ON G.UserId = A.Id WHERE A.AuthKey = $1";
+            var sql = "SELECT COUNT(*) FROM L_Geofence AS LG " +
+                      "INNER JOIN M_Auth AS A ON LG.UserId = A.Id " +
+                      "WHERE LG.CreatedAt + interval '120 minutes' < now() AT TIME ZONE 'Asia/Tokyo' " +
+                      "AND A.AuthKey = $1 AND LG.TransitionType = 1 " +
+                      "GROUP BY LG.Id ORDER BY LG.Id DESC LIMIT 1 OFFSET 0";
             var bind = [authKey];
             client.query(sql, bind, function(err, result) {
                 done();
+                console.log(err);
                 if (err) {
-                    res.status(403).end();
+                    res.status(500).end();
                     return;
                 }
+                console.log(result.rows);
 
-                json['data'] = result.rows;
-                res.set('Content-Type', 'application/json')
-                    .status(200)
-                    .send(JSON.stringify(json))
-                    .end();
-                    });
+                res.status(200).end();
+            });
         });
     } else {
         res.set('Content-Type', 'application/json')
             .status(200)
-            .send(JSON.stringify(json))
+            .send(JSON.stringify({}))
             .end();
     }
 });
 
-app.post("/register/username", function(req, res) {
+app.post("/geofence/log", function(req, res) {
     var authKey = req.body.authKey;
+    var transitionType = req.body.transitionType;
 
-    if (authenticated[authKey]) {
-        var userName = req.body.userName;
-        if (/^[a-zA-Z_-]{1,20}$/.test(userName)) {
-            pg.connect(conString, function(err, client, done) {
+    if (authenticated[authKey] && /^[1-4]$/.test(transitionType)) {
+        pg.connect(conString, function(err, client, done) {
+            if (err) {
+                res.status(500).end();
+                return;
+            }
+
+            var sql = "INSERT INTO L_Geofence (UserId, CreatedAt, TransitionType) " +
+                      "SELECT A.Id, now() AT TIME ZONE 'Asia/Tokyo', $1 FROM M_Auth AS A " +
+                      "WHERE A.AuthKey = $2";
+            var bind = [transitionType, authKey];
+            client.query(sql, bind, function(err, result) {
+                done();
                 if (err) {
                     res.status(500).end();
                     return;
                 }
 
-                var sql = "UPDATE M_Auth SET UserName = $1 WHERE AuthKey = $2";
-                var bind = [userName, authKey];
-                client.query(sql, bind, function(err, result) {
-                    done();
-                    if (err) {
-                        res.status(403).end();
-                        return;
-                    }
-
-                    res.status(200).end();
-                });
+                res.status(200).end();
             });
-        }
+        });
+    } else {
+        res.status(403).end();
+    }
+});
+
+app.post("/register/username", function(req, res) {
+    var authKey = req.body.authKey;
+    var userName = req.body.userName;
+    if (authenticated[authKey] && /^[a-zA-Z_-]{1,20}$/.test(userName)) {
+        pg.connect(conString, function(err, client, done) {
+            if (err) {
+                res.status(500).end();
+                return;
+            }
+
+            var sql = "UPDATE M_Auth SET UserName = $1 WHERE AuthKey = $2";
+            var bind = [userName, authKey];
+            client.query(sql, bind, function(err, result) {
+                done();
+                if (err) {
+                    res.status(500).end();
+                    return;
+                }
+
+                res.status(200).end();
+            });
+        });
     } else {
         res.status(403).end();
     }
