@@ -292,7 +292,7 @@ app.get("/geofence/status", function(req, res) {
 
             var sql = "SELECT COUNT(*) FROM L_Geofence AS LG " +
                       "INNER JOIN M_Auth AS A ON LG.UserId = A.Id " +
-                      "WHERE LG.CreatedAt + interval '3 minutes' > now() AT TIME ZONE 'Asia/Tokyo' " +
+                      "WHERE LG.CreatedAt + interval '1 minutes' > now() AT TIME ZONE 'Asia/Tokyo' " +
                       "AND A.AuthKey = $1 AND LG.TransitionType = 1 " +
                       "GROUP BY LG.Id ORDER BY LG.Id DESC LIMIT 1 OFFSET 0";
             var bind = [authKey];
