@@ -244,41 +244,41 @@ app.post("/auth", function(req, res) {
     }
 });
 
-// app.get("/geofence/data", function(req, res) {
-//     var authKey = req.query.authKey;
-//     var json = {'data': ""};
+app.get("/geofence/data", function(req, res) {
+    var authKey = req.query.authKey;
+    var json = {'data': ""};
 
-//     if (authenticated[authKey]) {
-//         pg.connect(conString, function(err, client, done) {
-//             if (err) {
-//                 res.status(500).end();
-//                 return;
-//             }
+    if (authenticated[authKey]) {
+        pg.connect(conString, function(err, client, done) {
+            if (err) {
+                res.status(500).end();
+                return;
+            }
 
-//             var sql = "SELECT Longitude AS Lng, Latitude AS Lat, Radius, Address, LandmarkName AS Landmark FROM M_Geofence AS G " +
-//                       "INNER JOIN M_Auth AS A ON G.UserId = A.Id WHERE A.AuthKey = $1";
-//             var bind = [authKey];
-//             client.query(sql, bind, function(err, result) {
-//                 done();
-//                 if (err) {
-//                     res.status(500).end();
-//                     return;
-//                 }
+            var sql = "SELECT Longitude AS Lng, Latitude AS Lat, Radius, Address, LandmarkName AS Landmark FROM M_Geofence AS G " +
+                      "INNER JOIN M_Auth AS A ON G.UserId = A.Id WHERE A.AuthKey = $1";
+            var bind = [authKey];
+            client.query(sql, bind, function(err, result) {
+                done();
+                if (err) {
+                    res.status(500).end();
+                    return;
+                }
 
-//                 json['data'] = result.rows;
-//                 res.set('Content-Type', 'application/json')
-//                     .status(200)
-//                     .send(JSON.stringify(json))
-//                     .end();
-//             });
-//         });
-//     } else {
-//         res.set('Content-Type', 'application/json')
-//             .status(200)
-//             .send(JSON.stringify(json))
-//             .end();
-//     }
-// });
+                json['data'] = result.rows;
+                res.set('Content-Type', 'application/json')
+                    .status(200)
+                    .send(JSON.stringify(json))
+                    .end();
+            });
+        });
+    } else {
+        res.set('Content-Type', 'application/json')
+            .status(200)
+            .send(JSON.stringify(json))
+            .end();
+    }
+});
 
 app.get("/geofence/status", function(req, res) {
     var authKey = req.query.authKey;
@@ -292,27 +292,29 @@ app.get("/geofence/status", function(req, res) {
 
             var sql = "SELECT COUNT(*) FROM L_Geofence AS LG " +
                       "INNER JOIN M_Auth AS A ON LG.UserId = A.Id " +
-                      "WHERE LG.CreatedAt + interval '120 minutes' < now() AT TIME ZONE 'Asia/Tokyo' " +
+                      "WHERE LG.CreatedAt + interval '3 minutes' > now() AT TIME ZONE 'Asia/Tokyo' " +
                       "AND A.AuthKey = $1 AND LG.TransitionType = 1 " +
                       "GROUP BY LG.Id ORDER BY LG.Id DESC LIMIT 1 OFFSET 0";
             var bind = [authKey];
             client.query(sql, bind, function(err, result) {
                 done();
-                console.log(err);
                 if (err) {
                     res.status(500).end();
                     return;
                 }
-                console.log(result.rows);
 
-                res.status(200).end();
+                // 0: Geofence内扱い、1: Geofence外扱い
+                console.log(result.rows);
+                var status = result.rows.length == 0 ? 1 : 0;
+                console.log(status);
+                res.set('Content-Type', 'application/json')
+                    .status(200)
+                    .send(JSON.stringify({'status':status}))
+                    .end();
             });
         });
     } else {
-        res.set('Content-Type', 'application/json')
-            .status(200)
-            .send(JSON.stringify({}))
-            .end();
+        res.status(403).end();
     }
 });
 
