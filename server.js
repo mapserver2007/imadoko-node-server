@@ -290,11 +290,13 @@ app.get("/geofence/status", function(req, res) {
                 return;
             }
 
-            var sql = "SELECT COUNT(*) FROM L_Geofence AS LG " +
+            var sql = "SELECT LG.TransitionType, MG.NotifyIn, MG.NotifyOut, MG.NotifyStay, " +
+                      "(CASE WHEN LG.CreatedAt + interval '120 minutes' > now() AT TIME ZONE 'Asia/Tokyo' THEN 0 ELSE 1 END) AS expired " +
+                      "FROM L_Geofence AS LG " +
                       "INNER JOIN M_Auth AS A ON LG.UserId = A.Id " +
-                      "WHERE LG.CreatedAt + interval '1 minutes' > now() AT TIME ZONE 'Asia/Tokyo' " +
-                      "AND A.AuthKey = $1 AND LG.TransitionType = 1 " +
-                      "GROUP BY LG.Id ORDER BY LG.Id DESC LIMIT 1 OFFSET 0";
+                      "INNER JOIN M_Geofence AS MG ON LG.UserId = MG.UserId " +
+                      "WHERE A.AuthKey = $1 " +
+                      "ORDER BY LG.Id DESC LIMIT 1 OFFSET 0";
             var bind = [authKey];
             client.query(sql, bind, function(err, result) {
                 done();
@@ -303,13 +305,20 @@ app.get("/geofence/status", function(req, res) {
                     return;
                 }
 
-                // 0: Geofence内扱い、1: Geofence外扱い
-                console.log(result.rows);
-                var status = result.rows.length == 0 ? 1 : 0;
-                console.log(status);
+                var json = {};
+                if (result.rows.length > 0) {
+                    json = {
+                        'transitionType': result.rows[0].transitiontype,
+                        'expired': result.rows[0].expired,
+                        'in': result.rows[0].notifyin,
+                        'out': result.rows[0].notifyout,
+                        'stay': result.rows[0].notifystay
+                    };
+                }
+
                 res.set('Content-Type', 'application/json')
                     .status(200)
-                    .send(JSON.stringify({'status':status}))
+                    .send(JSON.stringify(json))
                     .end();
             });
         });
