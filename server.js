@@ -255,7 +255,7 @@ app.get("/geofence/data", function(req, res) {
                 return;
             }
 
-            var sql = "SELECT Longitude AS Lng, Latitude AS Lat, Radius, Address, LandmarkName AS Landmark FROM M_Geofence AS G " +
+            var sql = "SELECT G.Id, Longitude AS Lng, Latitude AS Lat, Radius, Address, LandmarkName AS Landmark FROM M_Geofence AS G " +
                       "INNER JOIN M_Auth AS A ON G.UserId = A.Id WHERE A.AuthKey = $1";
             var bind = [authKey];
             client.query(sql, bind, function(err, result) {
@@ -290,7 +290,7 @@ app.get("/geofence/status", function(req, res) {
                 return;
             }
 
-            var sql = "SELECT LG.TransitionType, MG.NotifyIn, MG.NotifyOut, MG.NotifyStay, " +
+            var sql = "SELECT MG.Id AS PlaceId, LG.TransitionType, MG.NotifyIn, MG.NotifyOut, MG.NotifyStay, " +
                       "(CASE WHEN LG.CreatedAt + interval '120 minutes' > now() AT TIME ZONE 'Asia/Tokyo' THEN 0 ELSE 1 END) AS expired " +
                       "FROM L_Geofence AS LG " +
                       "INNER JOIN M_Auth AS A ON LG.UserId = A.Id " +
@@ -308,6 +308,7 @@ app.get("/geofence/status", function(req, res) {
                 var json = {};
                 if (result.rows.length > 0) {
                     json = {
+                        'placeId': result.rows[0].placeid,
                         'transitionType': result.rows[0].transitiontype,
                         'expired': result.rows[0].expired,
                         'in': result.rows[0].notifyin,
