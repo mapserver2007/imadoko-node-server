@@ -290,7 +290,7 @@ app.get("/geofence/status", function(req, res) {
                 return;
             }
 
-            var sql = "SELECT MG.Id AS PlaceId, LG.TransitionType, MG.NotifyIn, MG.NotifyOut, MG.NotifyStay, " +
+            var sql = "SELECT LG.PlaceId, LG.TransitionType, MG.NotifyIn, MG.NotifyOut, MG.NotifyStay, " +
                       "(CASE WHEN LG.CreatedAt + interval '120 minutes' > now() AT TIME ZONE 'Asia/Tokyo' THEN 0 ELSE 1 END) AS expired " +
                       "FROM L_Geofence AS LG " +
                       "INNER JOIN M_Auth AS A ON LG.UserId = A.Id " +
@@ -330,19 +330,20 @@ app.get("/geofence/status", function(req, res) {
 
 app.post("/geofence/log", function(req, res) {
     var authKey = req.body.authKey;
+    var placeId = req.body.placeId;
     var transitionType = req.body.transitionType;
 
-    if (authenticated[authKey] && /^[1-4]$/.test(transitionType)) {
+    if (authenticated[authKey] && /^\d+$/.test(placeId) && /^[1-4]$/.test(transitionType)) {
         pg.connect(conString, function(err, client, done) {
             if (err) {
                 res.status(500).end();
                 return;
             }
 
-            var sql = "INSERT INTO L_Geofence (UserId, CreatedAt, TransitionType) " +
-                      "SELECT A.Id, now() AT TIME ZONE 'Asia/Tokyo', $1 FROM M_Auth AS A " +
-                      "WHERE A.AuthKey = $2";
-            var bind = [transitionType, authKey];
+            var sql = "INSERT INTO L_Geofence (UserId, PlaceId, CreatedAt, TransitionType) " +
+                      "SELECT A.Id, $1, now() AT TIME ZONE 'Asia/Tokyo', $2 FROM M_Auth AS A " +
+                      "WHERE A.AuthKey = $3";
+            var bind = [placeId, transitionType, authKey];
             client.query(sql, bind, function(err, result) {
                 done();
                 if (err) {
