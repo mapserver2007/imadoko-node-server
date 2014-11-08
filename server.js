@@ -232,6 +232,30 @@ app.get('/connections/:connectionId', function(req, res) {
         .end();
 });
 
+app.get("/salt", function(req, res) {
+    pg.connect(conString, function(err, client, done) {
+        if (err) {
+            res.status(500).end();
+            return;
+        }
+
+        var sql = "SELECT Salt FROM M_AuthSalt";
+        client.query(sql, [], function(err, result) {
+            done();
+            if (err) {
+                res.status(500).end();
+                return;
+            }
+
+            var json = {'salt': result.rows[0].salt};
+            res.set('Content-Type', 'application/json')
+                .status(200)
+                .send(JSON.stringify(json))
+                .end();
+        });
+    });
+});
+
 app.post("/auth", function(req, res) {
     var authKey = req.body.authKey;
 
@@ -255,7 +279,7 @@ app.get("/geofence/data", function(req, res) {
                 return;
             }
 
-            var sql = "SELECT G.Id, Longitude AS Lng, Latitude AS Lat, Radius, Address, LandmarkName AS Landmark FROM M_Geofence AS G " +
+            var sql = "SELECT G.Id, Longitude AS Lng, Latitude AS Lat, Radius, Address, LandmarkName AS Landmark, A.UserName FROM M_Geofence AS G " +
                       "INNER JOIN M_Auth AS A ON G.UserId = A.Id WHERE A.AuthKey = $1";
             var bind = [authKey];
             client.query(sql, bind, function(err, result) {
