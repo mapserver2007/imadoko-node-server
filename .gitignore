@@ -1,4 +1,5 @@
 sandbox/
 node_modules/
 log/
+config/config.yml
 postgres.sql

@@ -15,8 +15,13 @@ var WebSocketServer = require('ws').Server,
     app = express(),
     pg = require('pg'),
     sha1 = require('sha1'),
+    fs = require('fs'),
+    yaml = require('js-yaml'),
+    mailer = require('nodemailer'),
+    smtpPool = require('nodemailer-smtp-pool'),
     port = process.env.PORT || 9224;
 
+// var config = yaml.safeLoad(fs.readFileSync('config/config.yml', 'utf8'));
 var connections = [];
 var authenticated = {};
 var appConst = {
@@ -170,7 +175,7 @@ var startWebSocketServer = function() {
 };
 
 // PostgreSQL
-var conString = process.env.DATABASE_URL;
+// var conString = config.debug ? config.conString : process.env.DATABASE_URL;
 pg.connect(conString, function(err, client, done) {
     if (err) {
         httpServer.close();
@@ -314,11 +319,13 @@ app.get("/geofence/status", function(req, res) {
                 return;
             }
 
-            var sql = "SELECT LG.PlaceId, LG.TransitionType, MG.NotifyIn, MG.NotifyOut, MG.NotifyStay, " +
-                      "(CASE WHEN LG.CreatedAt + interval '120 minutes' > now() AT TIME ZONE 'Asia/Tokyo' THEN 0 ELSE 1 END) AS expired " +
-                      "FROM L_Geofence AS LG " +
-                      "INNER JOIN M_Auth AS A ON LG.UserId = A.Id " +
-                      "INNER JOIN M_Geofence AS MG ON LG.UserId = MG.UserId " +
+            var sql = "SELECT (CASE WHEN LG.PlaceId IS NULL THEN 0 ELSE 1 END) AS PlaceId," +
+                      "(CASE WHEN LG.TransitionType IS NULL THEN 0 ELSE 1 END) AS TransitionType," +
+                      "MG.NotifyIn, MG.NotifyOut, MG.NotifyStay, MG.Longitude AS Lng, MG.Latitude AS Lat," +
+                      "(CASE WHEN LG.CreatedAt + interval '120 minutes' > now() AT TIME ZONE 'Asia/Tokyo' THEN 0 ELSE 1 END) AS Expired " +
+                      "FROM M_Geofence AS MG " +
+                      "INNER JOIN M_Auth AS A ON MG.UserId = A.Id " +
+                      "LEFT JOIN L_Geofence AS LG ON MG.UserId = LG.UserId " +
                       "WHERE A.AuthKey = $1 " +
                       "ORDER BY LG.Id DESC LIMIT 1 OFFSET 0";
             var bind = [authKey];
@@ -332,8 +339,8 @@ app.get("/geofence/status", function(req, res) {
                 var json = {};
                 if (result.rows.length > 0) {
                     json = {
-                        'placeId': result.rows[0].placeid,
-                        'transitionType': result.rows[0].transitiontype,
+                        'prevPlaceId': result.rows[0].placeid,
+                        'prevTransitionType': result.rows[0].transitiontype,
                         'expired': result.rows[0].expired,
                         'in': result.rows[0].notifyin,
                         'out': result.rows[0].notifyout,
@@ -409,4 +416,3 @@ app.post("/register/username", function(req, res) {
         res.status(403).end();
     }
 });
-
