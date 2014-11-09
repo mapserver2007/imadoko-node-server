@@ -176,6 +176,7 @@ var startWebSocketServer = function() {
 
 // PostgreSQL
 // var conString = config.debug ? config.conString : process.env.DATABASE_URL;
+var conString = process.env.DATABASE_URL;
 pg.connect(conString, function(err, client, done) {
     if (err) {
         httpServer.close();
@@ -204,9 +205,9 @@ var broadcast = function(message) {
     });
 };
 
-app.get('/', function(req, res) {
-    res.render('index');
-});
+// app.get('/', function(req, res) {
+//     res.render('index');
+// });
 
 app.get('/connections', function(req, res) {
     var connectionInfo = {connections: []};
