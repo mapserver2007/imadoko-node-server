@@ -320,8 +320,8 @@ app.get("/geofence/status", function(req, res) {
                 return;
             }
 
-            var sql = "SELECT (CASE WHEN LG.PlaceId IS NULL THEN 0 ELSE 1 END) AS PlaceId," +
-                      "(CASE WHEN LG.TransitionType IS NULL THEN 0 ELSE 1 END) AS TransitionType," +
+            var sql = "SELECT (CASE WHEN LG.PlaceId IS NULL THEN 0 ELSE LG.PlaceId END) AS PlaceId," +
+                      "(CASE WHEN LG.TransitionType IS NULL THEN 0 ELSE LG.TransitionType END) AS TransitionType," +
                       "MG.NotifyIn, MG.NotifyOut, MG.NotifyStay, MG.Longitude AS Lng, MG.Latitude AS Lat," +
                       "(CASE WHEN LG.CreatedAt + interval '120 minutes' > now() AT TIME ZONE 'Asia/Tokyo' THEN 0 ELSE 1 END) AS Expired " +
                       "FROM M_Geofence AS MG " +
