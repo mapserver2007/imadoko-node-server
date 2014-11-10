@@ -339,8 +339,6 @@ app.get("/geofence/status", function(req, res) {
                     return;
                 }
 
-                console.log(result.rows)
-
                 var json = {};
                 if (result.rows.length > 0) {
                     json = {
@@ -398,7 +396,7 @@ app.post("/geofence/log", function(req, res) {
 app.post("/register/username", function(req, res) {
     var authKey = req.body.authKey;
     var userName = req.body.userName;
-    if (authenticated[authKey] && /^[a-zA-Z_-]{1,20}$/.test(userName)) {
+    if (authenticated[authKey] && /^[1-9a-zA-Z_-]{1,20}$/.test(userName)) {
         pg.connect(conString, function(err, client, done) {
             if (err) {
                 res.status(500).end();
