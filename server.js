@@ -21,7 +21,6 @@ var WebSocketServer = require('ws').Server,
     smtpPool = require('nodemailer-smtp-pool'),
     port = process.env.PORT || 9224;
 
-// var config = yaml.safeLoad(fs.readFileSync('config/config.yml', 'utf8'));
 var connections = [];
 var authenticated = {};
 var appConst = {
@@ -175,6 +174,7 @@ var startWebSocketServer = function() {
 };
 
 // PostgreSQL
+// var config = yaml.safeLoad(fs.readFileSync('config/config.yml', 'utf8'));
 // var conString = config.debug ? config.conString : process.env.DATABASE_URL;
 var conString = process.env.DATABASE_URL;
 pg.connect(conString, function(err, client, done) {
@@ -312,6 +312,7 @@ app.get("/geofence/data", function(req, res) {
 
 app.get("/geofence/status", function(req, res) {
     var authKey = req.query.authKey;
+    var transitionType = req.query.transitionType;
 
     if (authenticated[authKey]) {
         pg.connect(conString, function(err, client, done) {
@@ -328,14 +329,17 @@ app.get("/geofence/status", function(req, res) {
                       "INNER JOIN M_Auth AS A ON MG.UserId = A.Id " +
                       "LEFT JOIN L_Geofence AS LG ON MG.UserId = LG.UserId " +
                       "WHERE A.AuthKey = $1 " +
+                      "AND (LG.TransitionType IS NULL OR LG.TransitionType = $2) " +
                       "ORDER BY LG.Id DESC LIMIT 1 OFFSET 0";
-            var bind = [authKey];
+            var bind = [authKey, transitionType];
             client.query(sql, bind, function(err, result) {
                 done();
                 if (err) {
                     res.status(500).end();
                     return;
                 }
+
+                console.log(result.rows)
 
                 var json = {};
                 if (result.rows.length > 0) {
