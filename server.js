@@ -321,17 +321,26 @@ app.get("/geofence/status", function(req, res) {
                 return;
             }
 
-            var sql = "SELECT (CASE WHEN LG.PlaceId IS NULL THEN 0 ELSE LG.PlaceId END) AS PlaceId," +
-                      "(CASE WHEN LG.TransitionType IS NULL THEN 0 ELSE LG.TransitionType END) AS TransitionType," +
-                      "MG.NotifyIn, MG.NotifyOut, MG.NotifyStay, MG.Longitude AS Lng, MG.Latitude AS Lat," +
-                      "(CASE WHEN LG.CreatedAt + interval '120 minutes' > now() AT TIME ZONE 'Asia/Tokyo' THEN 0 ELSE 1 END) AS Expired " +
-                      "FROM M_Geofence AS MG " +
-                      "INNER JOIN M_Auth AS A ON MG.UserId = A.Id " +
-                      "LEFT JOIN L_Geofence AS LG ON MG.UserId = LG.UserId " +
-                      "WHERE A.AuthKey = $1 " +
-                      "AND (LG.TransitionType IS NULL OR LG.TransitionType = $2) " +
-                      "ORDER BY LG.Id DESC LIMIT 1 OFFSET 0";
-            var bind = [authKey, transitionType];
+            var sql = "SELECT * FROM (" +
+                      "    SELECT LG.Id, (CASE WHEN LG.PlaceId IS NULL THEN 0 ELSE LG.PlaceId END) AS PlaceId, " +
+                      "        MG.NotifyIn, MG.NotifyOut, MG.NotifyStay, " +
+                      "        (CASE WHEN LG.CreatedAt + interval '120 minutes' > now() AT TIME ZONE 'Asia/Tokyo' THEN 0 ELSE 1 END) AS Expired " +
+                      "    FROM M_Geofence AS MG " +
+                      "    INNER JOIN M_Auth AS A ON MG.UserId = A.Id " +
+                      "    LEFT JOIN L_Geofence AS LG ON MG.UserId = LG.UserId " +
+                      "    WHERE A.AuthKey = $1 " +
+                      "    AND (LG.TransitionType IS NULL OR LG.TransitionType = $2) " +
+                      "    ORDER BY LG.Id DESC LIMIT 1 OFFSET 0" +
+                      ") AS T1 " +
+                      "CROSS JOIN " +
+                      "(" +
+                      "    SELECT LG2.TransitionType AS PrevTransitionType FROM M_Geofence AS MG2 " +
+                      "    INNER JOIN M_Auth AS A2 ON MG2.UserId = A2.Id " +
+                      "    LEFT JOIN L_Geofence AS LG2 ON MG2.UserId = LG2.UserId " +
+                      "    WHERE A2.AuthKey = $3 " +
+                      "    ORDER BY LG2.Id DESC LIMIT 1 OFFSET 0" +
+                      ") AS T2";
+            var bind = [authKey, transitionType, authKey];
             client.query(sql, bind, function(err, result) {
                 done();
                 if (err) {
@@ -343,7 +352,7 @@ app.get("/geofence/status", function(req, res) {
                 if (result.rows.length > 0) {
                     json = {
                         'prevPlaceId': result.rows[0].placeid,
-                        'prevTransitionType': result.rows[0].transitiontype,
+                        'prevTransitionType': result.rows[0].prevtransitiontype,
                         'expired': result.rows[0].expired,
                         'in': result.rows[0].notifyin,
                         'out': result.rows[0].notifyout,
