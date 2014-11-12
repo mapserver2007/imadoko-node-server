@@ -322,9 +322,8 @@ app.get("/geofence/status", function(req, res) {
             }
 
             var sql = "SELECT * FROM (" +
-                      "    SELECT LG.Id, (CASE WHEN LG.PlaceId IS NULL THEN 0 ELSE LG.PlaceId END) AS PlaceId, " +
-                      "        MG.NotifyIn, MG.NotifyOut, MG.NotifyStay, " +
-                      "        (CASE WHEN LG.CreatedAt + interval '120 minutes' > now() AT TIME ZONE 'Asia/Tokyo' THEN 0 ELSE 1 END) AS Expired " + // 前回の同一ステータスから一定時間経過
+                      "    SELECT LG.Id, MG.NotifyIn, MG.NotifyOut, MG.NotifyStay, " +
+                      "    (CASE WHEN LG.CreatedAt + interval '120 minutes' > now() AT TIME ZONE 'Asia/Tokyo' THEN 0 ELSE 1 END) AS Expired " + // 前回の同一ステータスから一定時間経過
                       "    FROM M_Geofence AS MG " +
                       "    INNER JOIN M_Auth AS A ON MG.UserId = A.Id " +
                       "    LEFT JOIN L_Geofence AS LG ON MG.UserId = LG.UserId " +
@@ -333,7 +332,8 @@ app.get("/geofence/status", function(req, res) {
                       "    ORDER BY LG.Id DESC LIMIT 1 OFFSET 0" +
                       ") AS T1 " +
                       "CROSS JOIN (" +
-                      "    SELECT (CASE WHEN LG2.TransitionType IS NULL THEN 0 ELSE LG2.TransitionType END) AS PrevTransitionType " +
+                      "    SELECT (CASE WHEN LG2.TransitionType IS NULL THEN 0 ELSE LG2.TransitionType END) AS PrevTransitionType, " +
+                      "    (CASE WHEN LG2.PlaceId IS NULL THEN 0 ELSE LG2.PlaceId END) AS PlaceId " +
                       "    FROM M_Geofence AS MG2 " +
                       "    INNER JOIN M_Auth AS A2 ON MG2.UserId = A2.Id " +
                       "    LEFT JOIN L_Geofence AS LG2 ON MG2.UserId = LG2.UserId " +
