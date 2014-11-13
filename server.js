@@ -26,6 +26,9 @@ var authenticated = {};
 var appConst = {
     device: {
         android: 1, browser: 2
+    },
+    request: {
+        watcher: 1, geofence: 2
     }
 };
 
@@ -88,37 +91,36 @@ var startWebSocketServer = function() {
 
         connections.push(ws);
 
-        var sendRequestAndroid = function(json) {
-            if (!json.userId) {
-                return;
-            }
+        // var sendRequestAndroid = function(json) {
+        //     if (!json.userId) {
+        //         return;
+        //     }
 
-            connections.forEach(function(connection) {
-                if (connection._deviceType === appConst.device.android && connection._userId === json.userId) {
-                    if (!ws.hasOwnProperty("_senderId") || ws._senderId === null) {
-                        ws._senderId = sha1(Math.random().toString(36));
-                    }
-                    ws._userId = json.userId;
-                    // 位置情報取得リクエストをAndroid端末に送信
-                    connection.send(JSON.stringify({authKey: connection._authKey, senderId: ws._senderId}));
-                    return;
-                }
-            });
+        //     connections.forEach(function(connection) {
+        //         if (connection._deviceType === appConst.device.android && connection._userId === json.userId) {
+        //             if (!ws.hasOwnProperty("_senderId") || ws._senderId === null) {
+        //                 ws._senderId = sha1(Math.random().toString(36));
+        //             }
+        //             ws._userId = json.userId;
+        //             // 位置情報取得リクエストをAndroid端末に送信
+        //             connection.send(JSON.stringify({authKey: connection._authKey, senderId: ws._senderId}));
+        //             return;
+        //         }
+        //     });
+        // };
 
-            // TODO ブラウザから宛先のAndroidに到達出来なかった場合の処理
-        };
-
-        var sendRequestBrowser = function(json) {
-            connections.forEach(function(connection) {
-                if (connection._deviceType === appConst.device.browser && connection._senderId === json.senderId) {
-                    // 位置情報取得リクエストをブラウザに送信
-                    connection.send(JSON.stringify({lng: json.lng, lat: json.lat, userId: connection._userId}));
-                    connection._senderId = null;
-                    connection._userId = null;
-                    return;
-                }
-            });
-        };
+        // // Obsolete Watcherアプリ開発時に削除予定
+        // var sendRequestBrowser = function(json) {
+        //     connections.forEach(function(connection) {
+        //         if (connection._deviceType === appConst.device.browser && connection._senderId === json.senderId) {
+        //             // 位置情報取得リクエストをブラウザに送信
+        //             connection.send(JSON.stringify({lng: json.lng, lat: json.lat, userId: connection._userId}));
+        //             connection._senderId = null;
+        //             connection._userId = null;
+        //             return;
+        //         }
+        //     });
+        // };
 
         ws.on("ping", function(data, flags) {
             var isConnected = false;
@@ -143,21 +145,32 @@ var startWebSocketServer = function() {
         ws.on('message', function(data) {
             var json = JSON.parse(data);
 
-            if (json.__ping__) {
-                console.log("ping from browser");
-                this.send(data);
-                return;
+            switch (json.requestId) {
+            case "1": // Watcher
+                // TODO
+                break;
+            case "2": // Geofence
+                this._geofenceCallback(json);
+                break;
             }
 
-            console.log(json.requestId);
-            switch (json.requestId) {
-            case 'send_request_android':
-                sendRequestAndroid(json);
-                break;
-            case 'send_request_browser':
-                sendRequestBrowser(json);
-                break;
-            }
+            // // Obsolete Watcherアプリ開発時に削除予定
+            // if (json.__ping__) {
+            //     console.log("ping from browser");
+            //     this.send(data);
+            //     return;
+            // }
+
+            // console.log(json.requestId);
+            // switch (json.requestId) {
+            // case 'send_request_android':
+            //     sendRequestAndroid(json);
+            //     break;
+            // case 'send_request_browser':
+            //     // Obsolete Watcherアプリ開発時に削除予定
+            //     sendRequestBrowser(json);
+            //     break;
+            // }
         });
 
         ws.on('error', function(e) {
@@ -314,62 +327,79 @@ app.get("/geofence/status", function(req, res) {
     var authKey = req.query.authKey;
     var transitionType = req.query.transitionType;
 
-    if (authenticated[authKey]) {
-        pg.connect(conString, function(err, client, done) {
-            if (err) {
-                res.status(500).end();
-                return;
+    connections.forEach(function(connection) {
+        if (connection._deviceType === appConst.device.android && connection._userId === "ryuichi_sx") { // TODO authKeyで比較
+            if (!connection.hasOwnProperty("_senderId") || connection._senderId === null) {
+                connection._senderId = sha1(Math.random().toString(36));
             }
+            // 位置情報取得リクエストをAndroid端末に送信
+            var json = {authKey: connection._authKey, senderId: connection._senderId, requestId: appConst.request.geofence};
+            connection._geofenceCallback = function(location) {
+                if (authenticated[authKey]) {
+                    pg.connect(conString, function(err, client, done) {
+                        if (err) {
+                            res.status(500).end();
+                            return;
+                        }
 
-            var sql = "SELECT * FROM (" +
-                      "    SELECT LG.Id, MG.NotifyIn, MG.NotifyOut, MG.NotifyStay, " +
-                      "    (CASE WHEN LG.CreatedAt + interval '120 minutes' > now() AT TIME ZONE 'Asia/Tokyo' THEN 0 ELSE 1 END) AS Expired " + // 前回の同一ステータスから一定時間経過
-                      "    FROM M_Geofence AS MG " +
-                      "    INNER JOIN M_Auth AS A ON MG.UserId = A.Id " +
-                      "    LEFT JOIN L_Geofence AS LG ON MG.UserId = LG.UserId " +
-                      "    WHERE A.AuthKey = $1 " +
-                      "    AND (LG.TransitionType IS NULL OR LG.TransitionType = $2) " +
-                      "    ORDER BY LG.Id DESC LIMIT 1 OFFSET 0" +
-                      ") AS T1 " +
-                      "CROSS JOIN (" +
-                      "    SELECT (CASE WHEN LG2.TransitionType IS NULL THEN 0 ELSE LG2.TransitionType END) AS PrevTransitionType, " +
-                      "    (CASE WHEN LG2.PlaceId IS NULL THEN 0 ELSE LG2.PlaceId END) AS PlaceId " +
-                      "    FROM M_Geofence AS MG2 " +
-                      "    INNER JOIN M_Auth AS A2 ON MG2.UserId = A2.Id " +
-                      "    LEFT JOIN L_Geofence AS LG2 ON MG2.UserId = LG2.UserId " +
-                      "    WHERE A2.AuthKey = $3 " +
-                      "    ORDER BY LG2.Id DESC LIMIT 1 OFFSET 0" +
-                      ") AS T2";
-            var bind = [authKey, transitionType, authKey];
-            client.query(sql, bind, function(err, result) {
-                done();
-                if (err) {
-                    res.status(500).end();
-                    return;
+                        var sql = "SELECT * FROM (" +
+                                  "    SELECT LG.Id, MG.NotifyIn, MG.NotifyOut, MG.NotifyStay, " +
+                                  "    (CASE WHEN LG.CreatedAt + interval '120 minutes' > now() AT TIME ZONE 'Asia/Tokyo' THEN 0 ELSE 1 END) AS Expired " + // 前回の同一ステータスから一定時間経過
+                                  "    FROM M_Geofence AS MG " +
+                                  "    INNER JOIN M_Auth AS A ON MG.UserId = A.Id " +
+                                  "    LEFT JOIN L_Geofence AS LG ON MG.UserId = LG.UserId " +
+                                  "    WHERE A.AuthKey = $1 " +
+                                  "    AND (LG.TransitionType IS NULL OR LG.TransitionType = $2) " +
+                                  "    ORDER BY LG.Id DESC LIMIT 1 OFFSET 0" +
+                                  ") AS T1 " +
+                                  "CROSS JOIN (" +
+                                  "    SELECT (CASE WHEN LG2.TransitionType IS NULL THEN 0 ELSE LG2.TransitionType END) AS PrevTransitionType, " +
+                                  "    (CASE WHEN LG2.PlaceId IS NULL THEN 0 ELSE LG2.PlaceId END) AS PlaceId " +
+                                  "    FROM M_Geofence AS MG2 " +
+                                  "    INNER JOIN M_Auth AS A2 ON MG2.UserId = A2.Id " +
+                                  "    LEFT JOIN L_Geofence AS LG2 ON MG2.UserId = LG2.UserId " +
+                                  "    WHERE A2.AuthKey = $3 " +
+                                  "    ORDER BY LG2.Id DESC LIMIT 1 OFFSET 0" +
+                                  ") AS T2";
+                        var bind = [authKey, transitionType, authKey];
+                        client.query(sql, bind, function(err, result) {
+                            done();
+                            if (err) {
+                                res.status(500).end();
+                                return;
+                            }
+
+                            var json = {};
+                            if (result.rows.length > 0) {
+                                json = {
+                                    'prevPlaceId': result.rows[0].placeid,
+                                    'prevTransitionType': result.rows[0].prevtransitiontype,
+                                    'recentTransitionType': result.rows[0].recenttransitiontype,
+                                    'expired': result.rows[0].expired,
+                                    'in': result.rows[0].notifyin,
+                                    'out': result.rows[0].notifyout,
+                                    'stay': result.rows[0].notifystay,
+                                    'lng': location.lng,
+                                    'lat': location.lat
+                                };
+                            }
+
+                            res.set('Content-Type', 'application/json')
+                                .status(200)
+                                .send(JSON.stringify(json))
+                                .end();
+                        });
+                    });
+                } else {
+                    res.status(403).end();
                 }
-
-                var json = {};
-                if (result.rows.length > 0) {
-                    json = {
-                        'prevPlaceId': result.rows[0].placeid,
-                        'prevTransitionType': result.rows[0].prevtransitiontype,
-                        'recentTransitionType': result.rows[0].recenttransitiontype,
-                        'expired': result.rows[0].expired,
-                        'in': result.rows[0].notifyin,
-                        'out': result.rows[0].notifyout,
-                        'stay': result.rows[0].notifystay
-                    };
-                }
-
-                res.set('Content-Type', 'application/json')
-                    .status(200)
-                    .send(JSON.stringify(json))
-                    .end();
-            });
-        });
-    } else {
-        res.status(403).end();
-    }
+            };
+            connection.send(JSON.stringify(json));
+            return;
+        } else {
+            res.status(403).end();
+        }
+    });
 });
 
 app.post("/geofence/log", function(req, res) {
