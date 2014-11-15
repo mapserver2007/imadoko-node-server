@@ -10,7 +10,7 @@
 'use strict';
 
 var WebSocketServer = require('ws').Server,
-    https = require('https'),
+    https = require('http'),
     express = require('express'),
     fs = require('fs'),
     model = require(__dirname + '/module/model.js'),
