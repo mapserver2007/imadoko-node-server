@@ -29,16 +29,20 @@ app.use(bodyParser.urlencoded({
     extended: true
 }));
 
+var httpServer;
 if (!process.env.PRODUCTION) {
     // 開発環境では自己署名証明書を使う
     var httpOptions = {
         key: fs.readFileSync(__dirname + '/cert/server.key'),
         cert: fs.readFileSync(__dirname + '/cert/server.crt'),
     };
+    httpServer = https.createServer(httpOptions, app);
+} else {
+    httpServer = https.createServer(app);
 }
 
 // HTTP Server
-var httpServer = https.createServer(httpOptions, app);
+// var httpServer = https.createServer(httpOptions, app);
 httpServer.listen(port);
 console.log('https server listening on %d', port);
 
