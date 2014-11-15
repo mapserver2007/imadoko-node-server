@@ -10,7 +10,6 @@
 'use strict';
 
 var WebSocketServer = require('ws').Server,
-    https = require('http'),
     express = require('express'),
     fs = require('fs'),
     model = require(__dirname + '/module/model.js'),
@@ -36,7 +35,7 @@ if (process.env.PRODUCTION) {
     // 本番環境ではhttpでhttps通信が可能
     https = require('http');
     httpServer = https.createServer(app);
-} else { // 開発環境
+} else {
     // 開発環境では自己署名証明書を使う
     https = require('https');
     var httpOptions = {
