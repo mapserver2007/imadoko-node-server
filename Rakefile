@@ -2,7 +2,7 @@
 require 'yaml'
 
 config_files = [] # 環境変数が必要ならここに入れること
-config = {}
+config = {'PRODUCTION' => true}
 config_files.each do |file|
   file.each {|key, value| config[key] = value}
 end

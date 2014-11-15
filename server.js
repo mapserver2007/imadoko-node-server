@@ -10,8 +10,9 @@
 'use strict';
 
 var WebSocketServer = require('ws').Server,
-    http = require('http'),
+    https = require('https'),
     express = require('express'),
+    fs = require('fs'),
     model = require(__dirname + '/module/model.js'),
     app = express(),
     cp = require('child_process'),
@@ -21,20 +22,25 @@ var WebSocketServer = require('ws').Server,
     port = process.env.PORT || 9224;
 
 var connections = [];
+var httpOptions = {};
 var appConst = model.appConst;
-
-// app.set('view engine', 'ejs');
-// app.use(express.static(__dirname + '/'));
-
 var bodyParser = require('body-parser');
 app.use(bodyParser.urlencoded({
     extended: true
 }));
 
+if (!process.env.PRODUCTION) {
+    // 開発環境では自己署名証明書を使う
+    var httpOptions = {
+        key: fs.readFileSync(__dirname + '/cert/server.key'),
+        cert: fs.readFileSync(__dirname + '/cert/server.crt'),
+    };
+}
+
 // HTTP Server
-var httpServer = http.createServer(app);
+var httpServer = https.createServer(httpOptions, app);
 httpServer.listen(port);
-console.log('http server listening on %d', port);
+console.log('https server listening on %d', port);
 
 // WebScoket Server
 var wsServer = new WebSocketServer({
