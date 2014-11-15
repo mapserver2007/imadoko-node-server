@@ -1,11 +1,11 @@
 /**
  * timer.js
- * version: 0.0.1 (2014/09/24)
+ * version: 0.0.1 (2014/11/15)
  *
  * Licensed under the MIT:
  *   http://www.opensource.org/licenses/mit-license.php
  *
- * Copyright 2013, Ryuichi TANAKA [mapserver2007@gmail.com]
+ * Copyright 2014, Ryuichi TANAKA [mapserver2007@gmail.com]
  */
 'use strict';
 

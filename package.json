@@ -25,6 +25,7 @@
     "js-yaml": "3.2.3",
     "nodemailer": "1.3.0",
     "nodemailer-smtp-pool": "0.1.8",
-    "xoauth2": "1.0.0"
+    "xoauth2": "1.0.0",
+    "here": "0.0.2"
   }
 }
