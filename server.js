@@ -23,8 +23,8 @@ var WebSocketServer = require('ws').Server,
 var connections = [];
 var appConst = model.appConst;
 
-app.set('view engine', 'ejs');
-app.use(express.static(__dirname + '/'));
+// app.set('view engine', 'ejs');
+// app.use(express.static(__dirname + '/'));
 
 var bodyParser = require('body-parser');
 app.use(bodyParser.urlencoded({
@@ -79,8 +79,6 @@ var startWebSocketServer = function() {
         ws.on("ping", function(data, flags) {
             var isConnected = false;
             var authKey = this._authKey;
-
-            console.log(authKey);
 
             connections.forEach(function(connection) {
                 if (connection._authKey === authKey) {
