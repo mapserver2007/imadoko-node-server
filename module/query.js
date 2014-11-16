@@ -32,7 +32,7 @@ module.exports = {
 
     geofenceStatus: h(/*
         SELECT * FROM (
-            SELECT LG.Id, MG.NotifyIn, MG.NotifyOut, MG.NotifyStay,
+            SELECT LG.Id, MG.NotifyIn, MG.NotifyOut, MG.NotifyStay, MG.Longitude, MG.Latitude,
             (CASE WHEN LG.CreatedAt + interval '120 minutes' > now() AT TIME ZONE 'Asia/Tokyo' THEN 0 ELSE 1 END) AS Expired
             FROM M_Geofence AS MG
             INNER JOIN M_Auth AS A ON MG.UserId = A.Id

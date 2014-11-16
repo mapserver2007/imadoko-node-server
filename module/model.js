@@ -199,8 +199,10 @@ module.exports = {
                         'in': result.rows[0].notifyin,
                         'out': result.rows[0].notifyout,
                         'stay': result.rows[0].notifystay,
-                        'lng': location.lng,
-                        'lat': location.lat
+                        'landmarkLng': result.rows[0].longitude,
+                        'landmarkLat': result.rows[0].latitude,
+                        'currentLng': location.lng,
+                        'currentLat': location.lat
                     };
                 }
                 writeResponse(res, status, json);
