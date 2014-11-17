@@ -181,34 +181,43 @@ module.exports = {
                 return;
             }
 
-            var connection = null;
-            for (var i = 0; i < connections.length; i++) {
-                if (connections[i]._authKey === userInfo.authkey && userInfo.locpermission === 1) {
-                    connection = connections[i];
-                    break;
+            createResponse(query.geofenceLocation, [userInfo.id], function(status, result) {
+                if (result.rows.length > 0) {
+                    writeResponse(res, 200, {
+                        'lng': result.rows[0].longitude,
+                        'lat': result.rows[0].latitude
+                    });
+                } else {
+                    var connection = null;
+                    for (var i = 0; i < connections.length; i++) {
+                        if (connections[i]._authKey === userInfo.authkey && userInfo.locpermission === 1) {
+                            connection = connections[i];
+                            break;
+                        }
+                    }
+
+                    if (connection === null) {
+                        writeResponse(res, 404);
+                        return;
+                    }
+
+                    connection._geofenceCallback = function(location) {
+                        delete this._errorCallback;
+                        writeResponse(res, 200, {
+                            'lng': location.lng,
+                            'lat': location.lat
+                        });
+                    };
+
+                    connection._errorCallback = function(status) {
+                        writeResponse(res, status);
+                    };
+
+                    // 位置情報取得リクエストをAndroid端末に送信
+                    var json = {authKey: connection._authKey, requestId: appConst.request.geofence};
+                    connection.send(JSON.stringify(json));
                 }
-            }
-
-            if (connection === null) {
-                writeResponse(res, 404);
-                return;
-            }
-
-            connection._geofenceCallback = function(location) {
-                delete this._errorCallback;
-                writeResponse(res, 200, {
-                    'lng': location.lng,
-                    'lat': location.lat
-                });
-            };
-
-            connection._errorCallback = function(status) {
-                writeResponse(res, status);
-            };
-
-            // 位置情報取得リクエストをAndroid端末に送信
-            var json = {authKey: connection._authKey, requestId: appConst.request.geofence};
-            connection.send(JSON.stringify(json));
+            });
         });
     },
 
