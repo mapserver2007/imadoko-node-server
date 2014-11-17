@@ -119,6 +119,9 @@ var startWebSocketServer = function() {
             case "2": // Geofence
                 this._geofenceCallback(json);
                 break;
+            default:
+                this._errorCallback(500);
+                break;
             }
         });
 
@@ -147,6 +150,9 @@ app.get('/connections/:connectionId', function(req, res) {
     model.connections(req, res, connections);
 });
 app.get("/salt", model.salt);
+app.get("/location", function(req, res) {
+    model.getLocation(req, res, connections);
+});
 app.get("/geofence/data", model.getGeofenceData);
 app.get("/geofence/status", function(req, res) {
     model.getGeofenceStatus(req, res, connections);

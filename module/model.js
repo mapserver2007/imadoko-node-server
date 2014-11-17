@@ -12,7 +12,6 @@
 var pg = require('pg'),
     fs = require('fs'),
     yaml = require('js-yaml'),
-    sha1 = require('sha1'),
     query = require(__dirname + '/query.js');
 
 var conString = process.env.DATABASE_URL || yaml.safeLoad(fs.readFileSync('config/config.yml', 'utf8')).conString;
@@ -162,7 +161,58 @@ module.exports = {
         });
     },
 
-    getGeofenceStatus: function(req, res, connections) {
+    getLocation: function(req, res, connections) {
+        var userName = req.query.userName;
+
+        if (!/^[1-9a-zA-Z_-]{1,20}$/.test(userName)) {
+            writeResponse(res, 404);
+            return;
+        }
+
+        createResponse(query.userInfo, [userName], function(status, result) {
+            if (result.rows.length === 0) {
+                writeResponse(res, 404);
+                return;
+            }
+
+            var userInfo = result.rows[0];
+            if (!authenticated[userInfo.authkey]) {
+                writeResponse(res, 403);
+                return;
+            }
+
+            var connection = null;
+            for (var i = 0; i < connections.length; i++) {
+                if (connections[i]._authKey === userInfo.authkey && userInfo.locpermission === 1) {
+                    connection = connections[i];
+                    break;
+                }
+            }
+
+            if (connection === null) {
+                writeResponse(res, 404);
+                return;
+            }
+
+            connection._geofenceCallback = function(location) {
+                delete this._errorCallback;
+                writeResponse(res, 200, {
+                    'lng': location.lng,
+                    'lat': location.lat
+                });
+            };
+
+            connection._errorCallback = function(status) {
+                writeResponse(res, status);
+            };
+
+            // 位置情報取得リクエストをAndroid端末に送信
+            var json = {authKey: connection._authKey, requestId: appConst.request.geofence};
+            connection.send(JSON.stringify(json));
+        });
+    },
+
+    getGeofenceStatus: function(req, res) {
         var authKey = req.query.authKey;
         var transitionType = req.query.transitionType;
 
@@ -171,47 +221,26 @@ module.exports = {
             return;
         }
 
-        var connection = null;
-        for (var i = 0; i < connections.length; i++) {
-            if (connections[i]._applicationType === appConst.applicationType.main && connections[i]._authKey === authKey) {
-                connection = connections[i];
-                if (!connection.hasOwnProperty("_senderId") || connection._senderId === null) {
-                    connection._senderId = sha1(Math.random().toString(36));
-                }
-                break;
-            }
-        }
-
-        if (connection === null) {
+        if (!/^(?:1|2|4)$/.test(transitionType)) {
             writeResponse(res, 404);
             return;
         }
 
-        connection._geofenceCallback = function(location) {
-            createResponse(query.geofenceStatus, [authKey, transitionType, authKey], function(status, result) {
-                var json = {};
-                if (result.rows.length > 0) {
-                    json = {
-                        'prevPlaceId': result.rows[0].placeid,
-                        'prevTransitionType': result.rows[0].prevtransitiontype,
-                        'recentTransitionType': result.rows[0].recenttransitiontype,
-                        'expired': result.rows[0].expired,
-                        'in': result.rows[0].notifyin,
-                        'out': result.rows[0].notifyout,
-                        'stay': result.rows[0].notifystay,
-                        'landmarkLng': result.rows[0].longitude,
-                        'landmarkLat': result.rows[0].latitude,
-                        'currentLng': location.lng,
-                        'currentLat': location.lat
-                    };
-                }
-                writeResponse(res, status, json);
-            });
-        };
-
-        // 位置情報取得リクエストをAndroid端末に送信
-        var json = {authKey: connection._authKey, senderId: connection._senderId, requestId: appConst.request.geofence};
-        connection.send(JSON.stringify(json));
+        createResponse(query.geofenceStatus, [authKey, transitionType, authKey], function(status, result) {
+            var json = {};
+            if (result.rows.length > 0) {
+                json = {
+                    'prevPlaceId': result.rows[0].placeid,
+                    'prevTransitionType': result.rows[0].prevtransitiontype,
+                    'recentTransitionType': result.rows[0].recenttransitiontype,
+                    'expired': result.rows[0].expired,
+                    'in': result.rows[0].notifyin,
+                    'out': result.rows[0].notifyout,
+                    'stay': result.rows[0].notifystay
+                };
+            }
+            writeResponse(res, status, json);
+        });
     },
 
     writeGeofenceLog: function(req, res) {
