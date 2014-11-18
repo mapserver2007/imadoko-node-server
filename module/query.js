@@ -52,18 +52,6 @@ module.exports = {
         ) AS T2
     */).unindent(),
 
-    geofenceLocation: h(/*
-        SELECT MG.Longitude, MG.Latitude FROM (
-            SELECT PlaceId, TransitionType FROM L_Geofence
-            WHERE UserId = $1
-            ORDER BY Id DESC
-            LIMIT 1 OFFSET 0
-        ) AS LG
-        INNER JOIN M_Geofence AS MG
-        ON LG.PlaceId = MG.Id
-        WHERE LG.TransitionType IN (1, 4)
-    */).unindent(),
-
     writeGeofenceLog: h(/*
         INSERT INTO L_Geofence (UserId, PlaceId, CreatedAt, TransitionType)
         SELECT U.Id, $1, now() AT TIME ZONE 'Asia/Tokyo', $2 FROM M_User AS U
