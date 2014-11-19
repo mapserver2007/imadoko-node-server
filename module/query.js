@@ -25,7 +25,7 @@ module.exports = {
     */).unindent(),
 
     geofenceData: h(/*
-        SELECT G.Id, Longitude AS Lng, Latitude AS Lat, Radius, Address, LandmarkName AS Landmark, U.UserName
+        SELECT G.Id, Longitude AS Lng, Latitude AS Lat, Radius, Address, LandmarkName AS Landmark, U.UserName, U.LocPermission
         FROM M_Geofence AS G
         INNER JOIN M_User AS U ON G.UserId = U.Id WHERE U.AuthKey = $1
     */).unindent(),
