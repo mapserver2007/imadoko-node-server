@@ -127,21 +127,22 @@ module.exports = {
         writeResponse(res, 200, connectionInfo);
     },
 
-    registerUserName: function(req, res) {
+    updateSetting: function(req, res) {
         var authKey = req.body.authKey;
         var userName = req.body.userName;
+        var locPermission = req.body.locPermission;
 
         if (!authenticated[authKey]) {
             writeResponse(res, 403);
             return;
         }
 
-        if (!/^[1-9a-zA-Z_-]{1,20}$/.test(userName)) {
+        if (!/^[1-9a-zA-Z_-]{1,20}$/.test(userName) || !/^[0,1]$/.test(locPermission)) {
             writeResponse(res, 404);
             return;
         }
 
-        createResponse(query.registerUserName, [userName, authKey], function(status) {
+        createResponse(query.registerUserName, [userName, locPermission, authKey], function(status) {
             writeResponse(res, status);
         });
     },

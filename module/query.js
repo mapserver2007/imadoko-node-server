@@ -21,7 +21,7 @@ module.exports = {
     */).unindent(),
 
     registerUserName: h(/*
-        UPDATE M_User SET UserName = $1 WHERE AuthKey = $2
+        UPDATE M_User SET UserName = $1, LocPermission = $2 WHERE AuthKey = $3
     */).unindent(),
 
     geofenceData: h(/*

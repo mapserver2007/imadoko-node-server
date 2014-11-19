@@ -160,5 +160,5 @@ app.get("/geofence/status", function(req, res) {
 
 // POST
 app.post("/auth", model.auth);
-app.post("/register/username", model.registerUserName);
+app.post("/setting/update", model.updateSetting);
 app.post("/geofence/log", model.writeGeofenceLog);
