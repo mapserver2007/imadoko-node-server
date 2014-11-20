@@ -89,8 +89,15 @@ module.exports = {
     },
 
     salt: function(req, res) {
-        createResponse(query.salt, [], function(status, result) {
-            writeResponse(res, status, {'salt': result.rows[0].salt});
+        var saltName = req.query.name;
+
+        if (!/^[1-9a-zA-Z]+$/.test(saltName)) {
+            writeResponse(res, 200, {'salt':''});
+            return;
+        }
+
+        createResponse(query.salt, [saltName], function(status, result) {
+            writeResponse(res, status, {'salt': result.rows.length === 1 ? result.rows[0].salt : ''});
         });
     },
 

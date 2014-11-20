@@ -17,7 +17,7 @@ module.exports = {
     */).unindent(),
 
     salt: h(/*
-        SELECT Salt FROM M_AuthSalt
+        SELECT Salt FROM M_AuthSalt WHERE Name = $1
     */).unindent(),
 
     registerUserName: h(/*
