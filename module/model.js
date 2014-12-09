@@ -21,7 +21,7 @@ var appConst = {
         main: "1", watcher: "2"
     },
     request: {
-        watcher: 1, geofence: 2
+        watcher: 1, geofence: 2, main: 3
     },
     salt: "imadoko-salt"
 };
@@ -56,6 +56,10 @@ var createResponse = function(sql, bind, response) {
     });
 };
 
+var isAuthenticated = function(authKey) {
+    return authKey in authenticated;
+};
+
 module.exports = {
     initialize: function(callback) {
         pg.connect(conString, function(err, client, done) {
@@ -88,6 +92,10 @@ module.exports = {
         return appConst;
     },
 
+    isAuthenticated: function(authKey) {
+        return authKey in authenticated;
+    },
+
     salt: function(req, res) {
         var saltName = req.query.name;
 
@@ -103,7 +111,7 @@ module.exports = {
 
     auth: function(req, res) {
         var authKey = req.body.authKey;
-        if (authenticated[authKey]) {
+        if (isAuthenticated(authKey)) {
             console.log("authenticate ok");
             res.status(200).end();
         } else {
@@ -139,7 +147,7 @@ module.exports = {
         var userName = req.body.userName;
         var locPermission = req.body.locPermission;
 
-        if (!authenticated[authKey]) {
+        if (!isAuthenticated(authKey)) {
             writeResponse(res, 403);
             return;
         }
@@ -158,7 +166,7 @@ module.exports = {
         var authKey = req.query.authKey;
         var json = {'data': ""};
 
-        if (!authenticated[authKey]) {
+        if (!isAuthenticated(authKey)) {
             writeResponse(res, 200, json);
             return;
         }
@@ -184,7 +192,7 @@ module.exports = {
             }
 
             var userInfo = result.rows[0];
-            if (!authenticated[userInfo.authkey]) {
+            if (!isAuthenticated(userInfo.authkey)) {
                 writeResponse(res, 403);
                 return;
             }
@@ -224,7 +232,7 @@ module.exports = {
         var authKey = req.query.authKey;
         var transitionType = req.query.transitionType;
 
-        if (!authenticated[authKey]) {
+        if (!isAuthenticated(authKey)) {
             writeResponse(res, 403);
             return;
         }
@@ -256,7 +264,7 @@ module.exports = {
         var placeId = req.body.placeId;
         var transitionType = req.body.transitionType;
 
-        if (!authenticated[authKey]) {
+        if (!isAuthenticated(authKey)) {
             writeResponse(res, 403);
             return;
         }

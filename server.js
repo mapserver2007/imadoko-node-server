@@ -52,9 +52,10 @@ var startWebSocketServer = function() {
     wsServer.on('connection', function(ws) {
         var authKey = ws.upgradeReq.headers['x-imadoko-authkey'];
         var applicationType = ws.upgradeReq.headers['x-imadoko-applicationtype'];
+        var connectionId = sha1(authKey + appConst.salt); // main,watcher含め一意になるのでauthKeyでHashとっておｋ
         var userId = model.getUserId(authKey);
-        ws._updatedAt = parseInt(new Date() / 1000, 10);
-        ws._connectionId = sha1(authKey + appConst.salt);
+        var createdAt = parseInt(new Date() / 1000, 10);
+        var updatedAt = createdAt;
 
         if (!authKey || !userId) {
             console.log("websocket connection failure.");
@@ -62,15 +63,20 @@ var startWebSocketServer = function() {
             return;
         }
 
-        // 同じデバイスから接続要求があった場合、それまでのコネクションを切断し新たに接続する
+        // 同じデバイスから接続要求があった場合はタイムスタンプのみ更新
         for (var index = 0; index < connections.length; index++) {
             if (connections[index]._authKey === authKey) {
-                connections[index].close();
+                connections[index]._updatedAt = updatedAt;
+                return;
             }
         }
         ws._authKey = authKey;
         ws._userId = userId;
         ws._applicationType = applicationType;
+        ws._connectionId = connectionId;
+        ws._createdAt = createdAt;
+        ws._updatedAt = updatedAt;
+
         connections.push(ws);
 
         ws.on("ping", function(data, flags) {
@@ -95,14 +101,32 @@ var startWebSocketServer = function() {
         });
 
         ws.on('message', function(data) {
+            var self = this;
             var json = JSON.parse(data);
 
             switch (json.requestId) {
             case "1": // Watcher
-                // TODO
+                connections.forEach(function(connection) {
+                    if (connection._authkey === json.authKey) {
+                        connection.send({
+                            authKey: connection._authkey,
+                            requestId: appConst.request.main
+                        });
+                    }
+                });
                 break;
             case "2": // Geofence
                 this._geofenceCallback(json);
+                break;
+            case "3": // main
+                connections.forEach(function(connection) {
+                    if (connection._authkey === json.authkey) {
+                        connection.send({
+                            lng: json.lng,
+                            lat: json.lat
+                        });
+                    }
+                });
                 break;
             default:
                 this._errorCallback(500);
