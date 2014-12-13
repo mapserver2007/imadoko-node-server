@@ -60,6 +60,6 @@ module.exports = {
 
     userInfo: h(/*
         SELECT Id, AuthKey, LocPermission FROM M_User
-        WHERE UserName = $1
+        WHERE AuthKey = $1
     */).unindent()
 };

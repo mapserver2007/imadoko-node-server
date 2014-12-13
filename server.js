@@ -16,8 +16,6 @@ var WebSocketServer = require('ws').Server,
     app = express(),
     cp = require('child_process'),
     sha1 = require('sha1'),
-    //mailer = require('nodemailer'),
-    //smtpPool = require('nodemailer-smtp-pool'),
     port = process.env.PORT || 9224;
 
 var connections = [];
@@ -28,10 +26,10 @@ app.use(bodyParser.urlencoded({
     extended: true
 }));
 
-var https = require('http');
-var httpServer = https.createServer(app);
+var http = require('http');
+var httpServer = http.createServer(app);
 httpServer.listen(port);
-console.log('https server listening on %d', port);
+console.log('http server listening on %d', port);
 
 // WebScoket Server
 var wsServer = new WebSocketServer({
@@ -52,18 +50,17 @@ var startWebSocketServer = function() {
     wsServer.on('connection', function(ws) {
         var authKey = ws.upgradeReq.headers['x-imadoko-authkey'];
         var applicationType = ws.upgradeReq.headers['x-imadoko-applicationtype'];
-        var connectionId = sha1(authKey + appConst.salt); // main,watcher含め一意になるのでauthKeyでHashとっておｋ
+        var connectionId = sha1(authKey + appConst.salt);
         var userId = model.getUserId(authKey);
         var createdAt = parseInt(new Date() / 1000, 10);
         var updatedAt = createdAt;
 
-        if (!authKey || !userId) {
+        if (!authKey) {
             console.log("websocket connection failure.");
             ws.close();
             return;
         }
 
-        // 同じデバイスから接続要求があった場合はタイムスタンプのみ更新
         for (var index = 0; index < connections.length; index++) {
             if (connections[index]._authKey === authKey) {
                 connections[index]._updatedAt = updatedAt;
@@ -103,30 +100,32 @@ var startWebSocketServer = function() {
         ws.on('message', function(data) {
             var self = this;
             var json = JSON.parse(data);
+            console.log(json);
 
             switch (json.requestId) {
-            case "1": // Watcher
+            case "1": // watcher -> main
                 connections.forEach(function(connection) {
-                    if (connection._authkey === json.authKey) {
-                        connection.send({
-                            authKey: connection._authkey,
-                            requestId: appConst.request.main
-                        });
+                    if (connection._connectionId === json.connectionId) {
+                        connection.send(JSON.stringify({
+                            authKey: connection._authKey,
+                            connectionId: self._connectionId,
+                            requestId: "2"
+                        }));
                     }
                 });
                 break;
-            case "2": // Geofence
-                this._geofenceCallback(json);
-                break;
-            case "3": // main
+            case "2": // main -> watcher
                 connections.forEach(function(connection) {
-                    if (connection._authkey === json.authkey) {
-                        connection.send({
+                    if (connection._connectionId === json.connectionId) {
+                        connection.send(JSON.stringify({
                             lng: json.lng,
                             lat: json.lat
-                        });
+                        }));
                     }
                 });
+                break;
+            case "3": // Location(REST->WS)
+                this._geofenceCallback(json);
                 break;
             default:
                 this._errorCallback(500);
@@ -156,7 +155,7 @@ app.get('/connections', function(req, res) {
     model.connections(req, res, connections);
 });
 app.get('/connections/:connectionId', function(req, res) {
-    model.connections(req, res, connections);
+    model.connection(req, res, connections);
 });
 app.get("/salt", model.salt);
 app.get("/location", function(req, res) {

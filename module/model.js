@@ -20,9 +20,6 @@ var appConst = {
     applicationType: {
         main: "1", watcher: "2"
     },
-    request: {
-        watcher: 1, geofence: 2, main: 3
-    },
     salt: "imadoko-salt"
 };
 
@@ -125,7 +122,10 @@ module.exports = {
         connections.forEach(function (connection) {
             connectionInfo.connections.push({
                 applicationType: connection._applicationType,
-                connectionId: connection._connectionId
+                connectionId: connection._connectionId,
+                createdAt: connection._createdAt,
+                updatedAt: connection._updatedAt,
+                userId: connection._userId
             });
         });
         writeResponse(res, 200, connectionInfo);
@@ -178,14 +178,21 @@ module.exports = {
     },
 
     getLocation: function(req, res, connections) {
-        var userName = req.query.userName;
+        var connectionId = req.query.connectionId;
 
-        if (!/^[1-9a-zA-Z_-]{1,20}$/.test(userName)) {
+        if (!/^[a-f0-9]{40}$/.test(connectionId)) {
             writeResponse(res, 404);
             return;
         }
 
-        createResponse(query.userInfo, [userName], function(status, result) {
+        var authKey;
+        connections.forEach(function(connection) {
+            if (connection._connectionId === connectionId) {
+                authKey = connection._authKey;
+            }
+        });
+
+        createResponse(query.userInfo, [authKey], function(status, result) {
             if (result.rows.length === 0) {
                 writeResponse(res, 404);
                 return;
@@ -223,7 +230,7 @@ module.exports = {
             };
 
             // 位置情報取得リクエストをAndroid端末に送信
-            var json = {authKey: connection._authKey, requestId: appConst.request.geofence};
+            var json = {authKey: connection._authKey, requestId: "3"};
             connection.send(JSON.stringify(json));
         });
     },
