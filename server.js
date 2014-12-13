@@ -100,7 +100,6 @@ var startWebSocketServer = function() {
         ws.on('message', function(data) {
             var self = this;
             var json = JSON.parse(data);
-            console.log(json);
 
             switch (json.requestId) {
             case "1": // watcher -> main
