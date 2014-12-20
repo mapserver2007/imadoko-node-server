@@ -123,6 +123,7 @@ module.exports = {
             connectionInfo.connections.push({
                 applicationType: connection._applicationType,
                 connectionId: connection._connectionId,
+                destinationId: connection._destinationId,
                 createdAt: connection._createdAt,
                 updatedAt: connection._updatedAt,
                 userId: connection._userId

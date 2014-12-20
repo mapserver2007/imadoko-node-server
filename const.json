@@ -1,0 +1,8 @@
+{
+    "requestId": {
+        "watcher_to_main": "1",
+        "main_to_watcher": "2",
+        "location": "3",
+        "connection_users": "4"
+    }
+}

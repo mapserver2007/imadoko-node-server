@@ -16,6 +16,7 @@ var WebSocketServer = require('ws').Server,
     app = express(),
     cp = require('child_process'),
     sha1 = require('sha1'),
+    constants = require(__dirname + '/const.json'),
     port = process.env.PORT || 9224;
 
 var connections = [];
@@ -25,6 +26,8 @@ var bodyParser = require('body-parser');
 app.use(bodyParser.urlencoded({
     extended: true
 }));
+
+var requestId = constants["requestId"];
 
 var http = require('http');
 var httpServer = http.createServer(app);
@@ -44,6 +47,17 @@ cp.fork(__dirname + '/timer.js').on('message', function(time) {
         return (time - conn._updatedAt < 30);
     });
 });
+
+var connectionUsers = function(destinationId) {
+    var connectionUserNum = 0;
+    connections.forEach(function (connection) {
+        if (connection._destinationId === destinationId) {
+            connectionUserNum++;
+        }
+    });
+
+    return connectionUserNum;
+};
 
 // WebSocket Connection
 var startWebSocketServer = function() {
@@ -73,8 +87,36 @@ var startWebSocketServer = function() {
         ws._connectionId = connectionId;
         ws._createdAt = createdAt;
         ws._updatedAt = updatedAt;
+        ws._destinationId = applicationType === "2" ?
+            ws.upgradeReq.headers['x-imadoko-destinationid'] : "";
 
         connections.push(ws);
+
+        if (ws._destinationId !== "") {
+            connections.forEach(function (connection) {
+                if (connection._connectionId === ws._destinationId) {
+                    connection.send(JSON.stringify({
+                        authKey: connection._authKey,
+                        requestId: requestId.connection_users,
+                        connectionStatus: "1",
+                        connectionUsers: connectionUsers(ws._destinationId)
+                    }));
+                    return;
+                }
+            });
+        } else {
+            connections.forEach(function (connection) {
+                if (connection._destinationId === ws._connectionId) {
+                    connection.send(JSON.stringify({
+                        authKey: connection._authKey,
+                        requestId: requestId.connection_users,
+                        connectionStatus: "1",
+                        connectionUsers: connectionUsers(ws._destinationId)
+                    }));
+                    return;
+                }
+            });
+        }
 
         ws.on("ping", function(data, flags) {
             var isConnected = false;
@@ -102,18 +144,18 @@ var startWebSocketServer = function() {
             var json = JSON.parse(data);
 
             switch (json.requestId) {
-            case "1": // watcher -> main
+            case requestId.watcher_to_main: // watcher -> main
                 connections.forEach(function(connection) {
-                    if (connection._connectionId === json.connectionId) {
+                    if (connection._connectionId === self._destinationId) {
                         connection.send(JSON.stringify({
                             authKey: connection._authKey,
                             connectionId: self._connectionId,
-                            requestId: "2"
+                            requestId: requestId.main_to_watcher
                         }));
                     }
                 });
                 break;
-            case "2": // main -> watcher
+            case requestId.main_to_watcher: // main -> watcher
                 connections.forEach(function(connection) {
                     if (connection._connectionId === json.connectionId) {
                         connection.send(JSON.stringify({
@@ -123,7 +165,7 @@ var startWebSocketServer = function() {
                     }
                 });
                 break;
-            case "3": // Location(REST->WS)
+            case REQUEST_LOCATION: // Location(REST->WS)
                 this._geofenceCallback(json);
                 break;
             default:
@@ -141,6 +183,19 @@ var startWebSocketServer = function() {
             connections = connections.filter(function (conn, index) {
                 return conn._connectionId !== ws._connectionId;
             });
+            if (ws._destinationId !== "") {
+                connections.forEach(function (connection) {
+                    if (connection._connectionId === ws._destinationId) {
+                        connection.send(JSON.stringify({
+                            authKey: connection._authKey,
+                            requestId: requestId.connection_users,
+                            connectionStatus: "2",
+                            connectionUsers: connectionUsers(ws._destinationId)
+                        }));
+                        return;
+                    }
+                });
+            }
         });
     });
 };
